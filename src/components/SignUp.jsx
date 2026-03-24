@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 function SignUp({ goLogin, goHome }) {
-  const [step, setStep] = useState(1); // 1: 기본정보, 2: 수면정보
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -55,25 +55,40 @@ function SignUp({ goLogin, goHome }) {
     if (validateStep1()) setStep(2);
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     setLoading(true);
-    // 임시 회원가입 처리 (백엔드 연결 전 UI 테스트용)
-    setTimeout(() => {
+    try {
+      const response = await fetch('http://localhost:8080/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name    : form.name,
+          email   : form.email,
+          password: form.password,
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        goHome(form.name, form.email);
+      } else {
+        alert(data.message);
+      }
+    } catch (err) {
+      alert('서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
+    } finally {
       setLoading(false);
-      // 실제 백엔드 연결 시 이 부분을 API 호출로 교체
-      goHome(form.name);
-    }, 1400);
-  };
+    }
+  };  // ← 여기가 빠져있었어요!
 
   const progressPct = step === 1 ? 50 : 100;
 
   return (
     <div className="auth-screen">
-      {/* 배경 장식 */}
       <div className="auth-bg-circle auth-bg-circle--1" />
       <div className="auth-bg-circle auth-bg-circle--2" />
 
-      {/* 상단 헤더 */}
       <div className="auth-signup-header">
         <button className="auth-back-btn" onClick={step === 1 ? goLogin : () => setStep(1)}>
           ← 뒤로
@@ -83,7 +98,6 @@ function SignUp({ goLogin, goHome }) {
         </div>
       </div>
 
-      {/* 진행 바 */}
       <div className="auth-progress-wrap">
         <div className="auth-progress-bar">
           <div className="auth-progress-fill" style={{ width: `${progressPct}%` }} />
@@ -94,7 +108,6 @@ function SignUp({ goLogin, goHome }) {
         </div>
       </div>
 
-      {/* 카드 */}
       <div className="auth-card">
         {step === 1 ? (
           <>
@@ -104,7 +117,6 @@ function SignUp({ goLogin, goHome }) {
             </div>
 
             <div className="auth-form">
-              {/* 이름 */}
               <div className="auth-input-group">
                 <label className="auth-label">이름</label>
                 <div className="auth-input-wrap">
@@ -120,7 +132,6 @@ function SignUp({ goLogin, goHome }) {
                 {errors.name && <div className="auth-field-error">{errors.name}</div>}
               </div>
 
-              {/* 이메일 */}
               <div className="auth-input-group">
                 <label className="auth-label">이메일</label>
                 <div className="auth-input-wrap">
@@ -136,7 +147,6 @@ function SignUp({ goLogin, goHome }) {
                 {errors.email && <div className="auth-field-error">{errors.email}</div>}
               </div>
 
-              {/* 비밀번호 */}
               <div className="auth-input-group">
                 <label className="auth-label">비밀번호 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(6자 이상)</span></label>
                 <div className="auth-input-wrap">
@@ -155,7 +165,6 @@ function SignUp({ goLogin, goHome }) {
                 {errors.password && <div className="auth-field-error">{errors.password}</div>}
               </div>
 
-              {/* 비밀번호 확인 */}
               <div className="auth-input-group">
                 <label className="auth-label">비밀번호 확인</label>
                 <div className="auth-input-wrap">
@@ -187,7 +196,6 @@ function SignUp({ goLogin, goHome }) {
             </div>
 
             <div className="auth-form">
-              {/* 목표 수면 시간 */}
               <div className="auth-input-group">
                 <label className="auth-label">
                   목표 수면 시간
@@ -206,7 +214,6 @@ function SignUp({ goLogin, goHome }) {
                 </div>
               </div>
 
-              {/* 기상 시간 */}
               <div className="auth-input-group">
                 <label className="auth-label">주로 일어나는 시간</label>
                 <div className="auth-input-wrap">
@@ -220,7 +227,6 @@ function SignUp({ goLogin, goHome }) {
                 </div>
               </div>
 
-              {/* 수면 고민 */}
               <div className="auth-input-group">
                 <label className="auth-label">현재 수면 고민 <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(복수 선택 가능)</span></label>
                 <div className="auth-issue-grid">
@@ -250,7 +256,6 @@ function SignUp({ goLogin, goHome }) {
         )}
       </div>
 
-      {/* 하단 */}
       {step === 1 && (
         <div className="auth-footer">
           이미 계정이 있으신가요?{' '}
