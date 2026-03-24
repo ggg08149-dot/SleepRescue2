@@ -1,21 +1,47 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Form
 from ultralytics import YOLO
-import os
+import joblib
+import pandas as pd
+import io
+from PIL import Image
+import numpy as np
+import cv2
 
 app = FastAPI()
 
-# 1. 모델 경로 설정 (사용자님 폴더 구조에 맞춤)
-# 현재 main.py 위치가 Node/ 라면 아래 경로가 맞을 거예요.
-MODEL_PATH = os.path.join("models", "YOLO", "best.pt") # 파일 이름이 'best.pt'가 맞는지 확인!
+# 1. 두 모델 모두 로드
+yolo_model = YOLO("models/YOLO/best.pt")
+ml_model = joblib.load("models/Sleep_XGBoost(ML)/sleep_xgb_model.pkl")
 
-# 2. YOLO 모델 로드
-# 서버가 켜질 때 모델을 미리 메모리에 올려두는 작업입니다.
-try:
-    model = YOLO(MODEL_PATH)
-    print("✅ YOLO 모델 로드 성공!")
-except Exception as e:
-    print(f"❌ 모델 로드 실패: {e}")
+# --- [방법 A] YOLO: 다크서클 분석 ---
+@app.post("/predict/yolo")
+async def predict_yolo(file: UploadFile = File(...)):
+    # (위에서 짠 다크서클 밝기 계산 로직 그대로 입력)
+    return {"status": "success", "dark_circle_score": 85.2}
 
-@app.get("/")
-def root():
-    return {"message": "FastAPI 서버 가동 중!", "model_status": "Loaded" if model else "Failed"}
+# --- [방법 B] ML: 수면 시간 및 점수 예측 ---
+@app.post("/predict/ml")
+async def predict_ml(
+    workout: float = Form(...), 
+    phone: float = Form(...), 
+    work: float = Form(...), 
+    caffeine: float = Form(...), 
+    relax: float = Form(...)
+):
+    # 팀원들이 입력한 데이터를 데이터프레임으로 변환
+    df = pd.DataFrame([{
+        'WorkoutTime': workout, 
+        'PhoneTime': phone, 
+        'WorkHours': work, 
+        'CaffeineIntake': caffeine, 
+        'RelaxationTime': relax
+    }])
+    
+    # XGBoost 예측 실행
+    pred_hours = round(float(ml_model.predict(df)[0]), 1)
+    
+    return {
+        "status": "success",
+        "predicted_sleep_hours": pred_hours,
+        "message": "생활 데이터 기반 수면 분석 완료"
+    }
