@@ -1,0 +1,449 @@
+/* =============================================
+   수면구조대 — 로그인 / 회원가입 전용 스타일
+   기존 App.css 변수 재사용
+   ============================================= */
+
+/* 전체 화면 레이아웃 */
+.auth-screen {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 배경 장식 원 */
+.auth-bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.auth-bg-circle--1 {
+  width: 300px;
+  height: 300px;
+  top: -80px;
+  right: -80px;
+  background: radial-gradient(circle, rgba(110,231,247,0.06) 0%, transparent 70%);
+}
+.auth-bg-circle--2 {
+  width: 250px;
+  height: 250px;
+  bottom: 60px;
+  left: -60px;
+  background: radial-gradient(circle, rgba(167,139,250,0.06) 0%, transparent 70%);
+}
+
+/* 로고 영역 (로그인 화면) */
+.auth-logo-area {
+  text-align: center;
+  margin-bottom: 32px;
+  position: relative;
+  z-index: 1;
+}
+.auth-logo-badge {
+  display: inline-block;
+  background: rgba(110,231,247,0.1);
+  border: 1px solid rgba(110,231,247,0.25);
+  color: var(--accent);
+  font-size: 10px;
+  padding: 3px 12px;
+  border-radius: 20px;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+}
+.auth-logo-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+.auth-logo-title span {
+  color: var(--accent);
+}
+.auth-logo-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-weight: 300;
+}
+
+/* 회원가입 상단 헤더 */
+.auth-signup-header {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+.auth-back-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: .2s;
+}
+.auth-back-btn:hover {
+  color: var(--text);
+  border-color: rgba(255,255,255,0.2);
+}
+.auth-step-info {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+/* 진행 바 */
+.auth-progress-wrap {
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+.auth-progress-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.auth-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #4dd8ee);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.auth-progress-steps {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted);
+}
+.auth-progress-steps .active {
+  color: var(--accent);
+}
+
+/* 카드 */
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 24px;
+  position: relative;
+  z-index: 1;
+}
+.auth-card-header {
+  margin-bottom: 24px;
+}
+.auth-card-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: var(--text);
+  line-height: 1;
+}
+.auth-card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  font-weight: 300;
+}
+
+/* 폼 */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.auth-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-label-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.auth-input-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 13px;
+  z-index: 1;
+  user-select: none;
+}
+.auth-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 44px 11px 36px;
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  outline: none;
+  transition: .2s;
+}
+.auth-input:focus {
+  border-color: rgba(110,231,247,0.4);
+  background: rgba(110,231,247,0.03);
+}
+.auth-input--error {
+  border-color: rgba(239,68,68,0.5) !important;
+}
+.auth-input-check {
+  position: absolute;
+  right: 12px;
+  color: var(--ok);
+  font-size: 14px;
+  font-weight: 700;
+}
+.auth-pw-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  transition: .2s;
+}
+.auth-pw-toggle:hover {
+  color: var(--text);
+}
+
+/* 에러 메시지 */
+.auth-error {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  color: #f87171;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.auth-field-error {
+  font-size: 11px;
+  color: #f87171;
+  padding-left: 4px;
+}
+
+/* 제출 버튼 */
+.auth-submit-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent), #4dd8ee);
+  color: #0b0b13;
+  border: none;
+  padding: 13px;
+  border-radius: 12px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  margin-top: 4px;
+}
+.auth-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+.auth-submit-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.auth-submit-btn--loading {
+  background: rgba(110,231,247,0.3);
+}
+
+/* 로딩 스피너 */
+.auth-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(11,11,19,0.3);
+  border-top-color: #0b0b13;
+  border-radius: 50%;
+  animation: authSpin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* 구분선 */
+.auth-divider {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 16px 0 0;
+  position: relative;
+}
+.auth-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  z-index: 0;
+}
+.auth-divider span {
+  background: var(--bg2);
+  padding: 0 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 보조 버튼 (회원가입 이동) */
+.auth-secondary-btn {
+  width: 100%;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 12px;
+  border-radius: 12px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: .2s;
+  margin-top: 10px;
+}
+.auth-secondary-btn:hover {
+  border-color: rgba(110,231,247,0.3);
+  color: var(--accent);
+  background: rgba(110,231,247,0.05);
+}
+
+/* 하단 안내 */
+.auth-footer {
+  margin-top: 20px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  line-height: 1.6;
+}
+.auth-footer span {
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* 슬라이더 (수면 시간) */
+.auth-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auth-slider-min, .auth-slider-max {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 24px;
+}
+.auth-slider-max {
+  text-align: right;
+}
+.auth-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) calc((var(--val, 50)) * 1%),
+    var(--border) calc((var(--val, 50)) * 1%)
+  );
+  outline: none;
+  cursor: pointer;
+}
+.auth-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg2);
+  transition: .2s;
+}
+.auth-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* 수면 고민 칩 */
+.auth-issue-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.auth-issue-chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 6px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: .2s;
+  text-align: center;
+}
+.auth-issue-chip:hover {
+  border-color: rgba(110,231,247,0.3);
+  color: var(--text);
+}
+.auth-issue-chip--active {
+  background: rgba(110,231,247,0.08);
+  border-color: rgba(110,231,247,0.4);
+  color: var(--accent);
+}
+.auth-chip-check {
+  font-size: 11px;
+}
+
+/* input[type=time] 다크테마 */
+input[type="time"] {
+  color-scheme: dark;
+}
