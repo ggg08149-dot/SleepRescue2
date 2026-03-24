@@ -50,8 +50,8 @@ app.post('/api/signup', async (req, res) => {
     // 비밀번호 암호화 (숫자 10 = 암호화 강도)
     const hashedPw = await bcrypt.hash(password, 10);
 
-    const sql = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
-    db.query(sql, [name, email, hashedPw], (err, result) => {
+    const sql = 'INSERT INTO tb_user (account_id, name, email, password) VALUES (?, ?, ?, ?)';
+    db.query(sql, [email, name, email, hashedPw], (err, result) => {
       if (err) {
         // 이메일 중복
         if (err.code === 'ER_DUP_ENTRY') {
