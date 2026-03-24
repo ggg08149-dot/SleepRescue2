@@ -6,7 +6,7 @@ const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 
 const app    = express();
-const PORT   = 3000;
+const PORT   = 7000;
 const SECRET = 'sleeprescue_secret_key';
 
 // ─── 미들웨어 ────────────────────────────────
