@@ -6,7 +6,7 @@ const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 
 const app    = express();
-const PORT   = 8080;
+const PORT   = 3000;
 const SECRET = 'sleeprescue_secret_key';
 
 // ─── 미들웨어 ────────────────────────────────
@@ -69,7 +69,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 // ─── 로그인 API ──────────────────────────────
-// 주소: POST http://localhost:8080/api/login
+// 주소: POST http://localhost:3000/api/login
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -78,7 +78,7 @@ app.post('/api/login', async (req, res) => {
     return res.json({ success: false, message: '이메일과 비밀번호를 입력해주세요.' });
   }
 
-  const sql = 'SELECT * FROM users WHERE email = ?';
+  const sql = 'SELECT * FROM tb_user WHERE email = ?';
   db.query(sql, [email], async (err, results) => {
     if (err) {
       console.log('로그인 에러:', err);
@@ -100,7 +100,7 @@ app.post('/api/login', async (req, res) => {
 
     // 로그인 토큰 발급 (7일 유효)
     const token = jwt.sign(
-      { id: user.id, name: user.name },
+      { id: user.user_idx, name: user.name },
       SECRET,
       { expiresIn: '7d' }
     );
