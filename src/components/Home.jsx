@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const calData = {
   1:'bad',2:'warn',3:'good',4:'good',5:'warn',
@@ -6,23 +6,43 @@ const calData = {
   11:'warn',12:'bad',13:'bad',14:'good',15:'good',
   16:'warn',17:'today'
 };
-
 const calScores = {
   1:'72',2:'65',3:'58',4:'55',5:'61',
   6:'52',7:'70',8:'63',9:'56',10:'54',
-  11:'68',12:'74',13:'71',14:'59',15:'51',
-  16:'66'
+  11:'68',12:'74',13:'71',14:'59',15:'51',16:'66'
 };
 
-function Home({ goAnalyze, analysisResult, startCoaching }) {
+const getFatigueEmoji = (fatigue) => {
+  if (fatigue === 'high') return { emoji: '😵', label: '위험', color: '#ef4444' };
+  if (fatigue === 'mid') return { emoji: '😟', label: '주의', color: '#f59e0b' };
+  return { emoji: '😊', label: '양호', color: '#22c55e' };
+};
+
+const DEFAULT_MISSIONS = [
+  { id: 1, text: '오후 2시 이후 카페인 섭취 금지' },
+  { id: 2, text: '취침 1시간 전 스마트폰 사용 중단' },
+  { id: 3, text: '취침 전 스팀 온열 안대 10분' },
+];
+
+function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자' }) {
   const arcRef = useRef(null);
   const numRef = useRef(null);
   const sg1Ref = useRef(null);
   const sg2Ref = useRef(null);
 
+  const [streak, setStreak] = useState(5);
+  const [missionChecks, setMissionChecks] = useState([false, false, false]);
+  const [missionSaved, setMissionSaved] = useState(false);
+
+  const fatigue = analysisResult?.fatigue || 'high';
+  const fatigueInfo = getFatigueEmoji(fatigue);
+  const fireSize = Math.min(1 + (streak * 0.04), 1.8);
+  const fatigueScore = fatigue === 'high' ? 72 : fatigue === 'mid' ? 45 : 20;
+  const fatigueDashTarget = 264 - (264 * (fatigueScore / 100));
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (arcRef.current) arcRef.current.style.strokeDashoffset = 264 - (264 * 0.72);
+      if (arcRef.current) arcRef.current.style.strokeDashoffset = fatigueDashTarget;
       if (sg1Ref.current) sg1Ref.current.style.strokeDashoffset = 157 - (157 * 0.72);
       if (sg2Ref.current) sg2Ref.current.style.strokeDashoffset = 157 - (157 * 0.80);
       let cur = 0;
@@ -35,6 +55,19 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
     return () => clearTimeout(timer);
   }, []);
 
+  const toggleMission = (idx) => {
+    const next = [...missionChecks];
+    next[idx] = !next[idx];
+    setMissionChecks(next);
+    setMissionSaved(false);
+  };
+
+  const saveMissions = () => {
+    setMissionSaved(true);
+    if (missionChecks.every(Boolean)) setStreak(prev => prev + 1);
+  };
+
+  const completedCount = missionChecks.filter(Boolean).length;
   const scores = [6.8, 5.2, 7.1, 4.9, 6.3, 5.8, 4.2];
   const maxS = Math.max(...scores);
   const days = ['월','화','수','목','금','토','일'];
@@ -48,7 +81,10 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
         <div className="hero-left">
           <div className="hero-badge">AI SLEEP ANALYSIS</div>
           <div className="hero-title">당신의<br />수면을<br /><span>구조합니다</span></div>
-          <div className="hero-sub">웹캠으로 다크서클을 분석하고<br />생활 패턴 기반 맞춤형 수면 코칭 제공</div>
+          <div className="hero-sub">
+            안녕하세요 <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{userName}</span>님!<br />
+            오늘도 수면 관리 함께해요
+          </div>
           <button className="scan-btn" onClick={goAnalyze}>📷 분석 시작하기</button>
         </div>
         <div className="cam-gauge">
@@ -70,17 +106,137 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
           </svg>
           <div className="scan-line-box"><div className="scan-line"></div></div>
           <div className="cam-inner">
-            <div className="cam-face">😴</div>
-            <div className="cam-pct" ref={numRef}>0%</div>
-            <div className="cam-danger">위험</div>
+            <div style={{ fontSize: '32px', lineHeight: 1, transition: 'all 0.5s ease' }}>
+              {fatigueInfo.emoji}
+            </div>
+            <div className="cam-pct" ref={numRef} style={{ color: fatigueInfo.color }}>{fatigueScore}%</div>
+            <div className="cam-danger" style={{ color: fatigueInfo.color, fontSize: '8px' }}>피로지수</div>
           </div>
+        </div>
+      </div>
+
+      {/* 데일리 위젯 */}
+      <div className="section-title">DAILY MISSION</div>
+      <div className="daily-widget">
+        {/* 연속 달성 스트릭 */}
+        <div className="streak-row">
+          <div className="streak-fire-wrap">
+            <span style={{
+              fontSize: `${28 * fireSize}px`,
+              display: 'inline-block',
+              animation: 'fireWiggle 0.7s ease-in-out infinite alternate',
+              filter: streak >= 7 ? 'drop-shadow(0 0 6px #f59e0b)' : 'none',
+              transition: 'font-size 0.5s ease',
+              lineHeight: 1,
+            }}>🔥</span>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                <span style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: '28px',
+                  color: streak >= 7 ? '#f59e0b' : streak >= 3 ? '#fbbf24' : 'var(--accent)',
+                  lineHeight: 1,
+                  transition: 'color 0.5s ease',
+                }}>{streak}</span>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>일 연속 달성</span>
+              </div>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>
+                {streak >= 7 ? '🏆 일주일 달성!' : streak >= 3 ? '💪 계속 가즈아!' : '🌱 시작이 반이에요!'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ flex: 1, marginLeft: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '5px' }}>
+              <span>오늘 미션</span>
+              <span style={{ color: completedCount === 3 ? '#22c55e' : 'rgba(255,255,255,0.4)' }}>{completedCount}/3</span>
+            </div>
+            <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${(completedCount / 3) * 100}%`,
+                background: completedCount === 3 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg, var(--accent), #4dd8ee)',
+                borderRadius: '4px',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+          </div>
+        </div>
+
+        {/* 미션 목록 */}
+        <div style={{ margin: '12px 0 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {DEFAULT_MISSIONS.map((mission, idx) => (
+            <div
+              key={mission.id}
+              onClick={() => toggleMission(idx)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 12px',
+                background: missionChecks[idx] ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${missionChecks[idx] ? 'rgba(110,231,247,0.2)' : 'var(--border)'}`,
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{
+                width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
+                border: `1.5px solid ${missionChecks[idx] ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+                background: missionChecks[idx] ? 'var(--accent)' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '11px', color: '#0b0b13', fontWeight: 700,
+                transition: 'all 0.2s ease',
+              }}>
+                {missionChecks[idx] && '✓'}
+              </div>
+              <span style={{
+                fontSize: '12px',
+                flex: 1,
+                textDecoration: missionChecks[idx] ? 'line-through' : 'none',
+                color: missionChecks[idx] ? 'rgba(255,255,255,0.35)' : 'var(--text)',
+                transition: 'all 0.2s ease',
+              }}>
+                {mission.text}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* 하단 버튼 */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={saveMissions}
+            disabled={missionSaved}
+            style={{
+              background: missionSaved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${missionSaved ? 'rgba(34,197,94,0.35)' : 'var(--border)'}`,
+              color: missionSaved ? '#22c55e' : 'var(--muted)',
+              padding: '9px 16px', borderRadius: '9px', fontSize: '12px',
+              cursor: missionSaved ? 'default' : 'pointer',
+              fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.3s ease',
+            }}
+          >
+            {missionSaved ? '✓ 저장됨' : '저장하기'}
+          </button>
+          <button
+            onClick={() => startCoaching && startCoaching(7)}
+            style={{
+              flex: 1,
+              background: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(110,231,247,0.08))',
+              border: '1px solid rgba(167,139,250,0.25)',
+              color: 'var(--accent2)', padding: '9px 14px', borderRadius: '9px',
+              fontSize: '12px', cursor: 'pointer',
+              fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.2s ease',
+            }}
+          >
+            💬 지금 바로 오늘의 수면 미션을 확인하세요! →
+          </button>
         </div>
       </div>
 
       {/* TODAY'S ANALYSIS */}
       <div className="section-title">TODAY'S ANALYSIS</div>
       <div className="charts-grid">
-        {/* 반원 게이지 - 다크서클 */}
         <div className="stat-card">
           <div className="stat-label">다크서클 지수</div>
           <div style={{ textAlign: 'center', marginTop: '4px' }}>
@@ -101,7 +257,6 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
           </div>
         </div>
 
-        {/* 반원 게이지 - 피로도 */}
         <div className="stat-card">
           <div className="stat-label">최근 피로도</div>
           <div style={{ textAlign: 'center', marginTop: '4px' }}>
@@ -115,7 +270,6 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
           </div>
         </div>
 
-        {/* 수면 점수 바 차트 */}
         <div className="stat-card">
           <div className="stat-label">최근 수면 점수</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '50px', marginTop: '8px' }}>
@@ -133,7 +287,6 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
           </div>
         </div>
 
-        {/* 다크서클 라인 차트 */}
         <div className="stat-card">
           <div className="stat-label">다크서클 추이</div>
           <svg viewBox="0 0 100 50" width="100%" height="44" style={{ marginTop: '6px', overflow: 'visible' }}>
@@ -158,6 +311,7 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
         {[
           { label: '카페인 섭취량', val: '280', unit: 'mg', pct: 85, color: '#ef4444', tag: '기준 초과' },
           { label: '스크린 타임', val: '6.5', unit: 'h', pct: 72, color: '#f59e0b', tag: '주의 필요' },
+          { label: '근무시간', val: '9', unit: 'h', pct: 75, color: '#f59e0b', tag: '주의 필요' },
           { label: '운동시간', val: '45', unit: '분', pct: 75, color: '#22c55e', tag: '양호' },
           { label: '수면 시간', val: '5', unit: 'h', pct: 55, color: '#f59e0b', tag: '권장 7~8h' },
         ].map(item => (
@@ -170,7 +324,7 @@ function Home({ goAnalyze, analysisResult, startCoaching }) {
         ))}
       </div>
 
-      {/* 수면 캘린더 */}
+      {/* 캘린더 */}
       <div className="section-title">SLEEP CALENDAR</div>
       <div className="week-chart" style={{ padding: '14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
