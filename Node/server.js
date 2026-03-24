@@ -51,7 +51,7 @@ app.post('/api/signup', async (req, res) => {
     const hashedPw = await bcrypt.hash(password, 10);
 
     const sql = 'INSERT INTO tb_user (account_id, name, email, password) VALUES (?, ?, ?, ?)';
-    db.query(sql, [email, name, email, hashedPw], (err, result) => {
+    db.query(sql, [email, name, email, hasZWhedPw], (err, result) => {
       if (err) {
         // 이메일 중복
         if (err.code === 'ER_DUP_ENTRY') {
