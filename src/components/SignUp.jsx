@@ -58,7 +58,7 @@ function SignUp({ goLogin, goHome }) {
   const handleSignUp = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/signup', {
+      const response = await fetch('http://localhost:7000/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
