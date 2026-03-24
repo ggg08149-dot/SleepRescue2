@@ -1,6 +1,24 @@
 import React, { useState, useRef } from 'react';
 
-function Analyze({ backHome, updateResult, startCoaching }) {
+const getFatigueMessage = (fatigue, userName, causeName) => {
+  if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
+  if (fatigue === 'mid') return `수면 구조대가 분석해보니, 오늘 ${userName}님의 피로도가 '주의' 단계에 들어섰어요. 특히 ${causeName}의 영향으로 눈가가 평소보다 어두워진 상태예요.`;
+  return `수면 구조대가 분석해보니, 오늘 ${userName}님의 피로는 안정적인 '낮음' 단계예요. ${causeName} 수치가 잘 관리되고 있어 눈가도 평소보다 훨씬 맑고 생기 있어 보이는 상태예요. 지금의 컨디션을 내일도 유지할 수 있도록 가벼운 수면 처방을 확인해 보세요.`;
+};
+
+const FATIGUE_LEVELS = [
+  { key: 'high', label: '높음', icon: '🔥', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)' },
+  { key: 'mid',  label: '주의', icon: '⚠️', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.5)' },
+  { key: 'low',  label: '낮음', icon: '✅', color: '#22c55e', bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.4)' },
+];
+
+const PLAN_DATA = [
+  { n: 1,  days: '1',  label: '1일 플랜',  desc: '내일 중요한 미팅이 있나요?\n안색 긴급 복구를 시작하세요.' },
+  { n: 7,  days: '7',  label: '7일 플랜',  desc: '일주일만 투자하세요.\n내 눈가를 어둡게 만든 진짜 범인을 찾아드립니다.' },
+  { n: 15, days: '15', label: '15일 플랜', desc: '만성 피로 탈출 프로젝트.\n다크서클 없는 맑은 아침을 약속합니다.' },
+];
+
+function Analyze({ backHome, updateResult, startCoaching, userName = '사용자' }) {
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [drinks, setDrinks] = useState([]);
@@ -61,23 +79,7 @@ function Analyze({ backHome, updateResult, startCoaching }) {
     startCoaching(selectedPlan);
   };
 
-  const getFatigueStyle = () => {
-    if (!result) return null;
-    if (result.fatigue === 'high') return {
-      bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)',
-      color: '#ef4444', icon: '🔴', label: '높음 — 즉각 조치 필요'
-    };
-    if (result.fatigue === 'mid') return {
-      bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)',
-      color: '#f59e0b', icon: '🟡', label: '주의 — 관리 필요'
-    };
-    return {
-      bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.3)',
-      color: '#22c55e', icon: '🟢', label: '낮음 — 양호한 상태'
-    };
-  };
 
-  const fs = getFatigueStyle();
   const drinkList = ['☕ 아메리카노', '🧋 라떼', '⚡ 에너지음료', '🍵 녹차', '🚫 없음'];
 
   return (
@@ -186,46 +188,106 @@ function Analyze({ backHome, updateResult, startCoaching }) {
       </div>
 
       {/* 분석 결과 */}
-      {result && fs && (
+      {result && (
         <div ref={resultRef}>
-          <div className="section-title">분석 결과</div>
 
-          {/* 피로도 경고 배너 */}
+          {/* 피로도 분석 결과 카드 */}
           <div style={{
-            background: fs.bg, border: `1px solid ${fs.border}`,
-            borderRadius: '12px', padding: '14px', marginBottom: '12px',
-            display: 'flex', alignItems: 'center', gap: '12px'
+            background: 'linear-gradient(135deg, #1e1040, #2a1a5e)',
+            border: '1px solid rgba(167,139,250,0.25)',
+            borderRadius: '16px', padding: '20px', marginBottom: '14px',
           }}>
-            <div style={{ fontSize: '28px', flexShrink: 0 }}>{fs.icon}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>현재 피로도 상태</div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: fs.color, lineHeight: 1 }}>{fs.label}</div>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '3px' }}>
-                다크서클 {result.darkCircle}% · 수면점수 {result.sleepScore}pts · 3일 평균 {result.avg3}%
-              </div>
+            <div style={{ textAlign: 'center', fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: '16px', letterSpacing: '1px' }}>
+              피로도 분석 결과
             </div>
-            <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '36px', color: fs.color, lineHeight: 1 }}>{result.darkCircle}</div>
-              <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)' }}>피로지수</div>
+
+            {/* 3단계 선택 인디케이터 */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '18px' }}>
+              {FATIGUE_LEVELS.map(lv => {
+                const isActive = result.fatigue === lv.key;
+                return (
+                  <div key={lv.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '52px', height: '52px', borderRadius: '50%',
+                      background: isActive ? lv.bg : 'rgba(255,255,255,0.04)',
+                      border: `2px solid ${isActive ? lv.border : 'rgba(255,255,255,0.1)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '22px',
+                      boxShadow: isActive ? `0 0 14px ${lv.border}` : 'none',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      {lv.icon}
+                    </div>
+                    <div style={{
+                      fontSize: '11px', fontWeight: isActive ? 700 : 400,
+                      color: isActive ? lv.color : 'rgba(255,255,255,0.3)',
+                      transition: 'all 0.3s ease',
+                    }}>{lv.label}</div>
+                  </div>
+                );
+              })}
             </div>
+
+            {/* 피로도 레벨 뱃지 + 메시지 */}
+            {(() => {
+              const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue);
+              const causeName = '다크서클 지수 상승';
+              const msg = getFatigueMessage(result.fatigue, userName, causeName);
+              return (
+                <div style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${lv.border}`,
+                  borderRadius: '12px', padding: '14px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{
+                      background: lv.bg, border: `1px solid ${lv.border}`,
+                      color: lv.color, fontSize: '11px', fontWeight: 700,
+                      padding: '3px 10px', borderRadius: '20px',
+                    }}>{lv.label}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                      {userName}님의 피로 {lv.label}
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '12px', color: 'rgba(255,255,255,0.6)',
+                    lineHeight: 1.8, fontWeight: 300,
+                  }}>
+                    {msg.split(causeName).map((part, i, arr) => (
+                      <span key={i}>
+                        {part}
+                        {i < arr.length - 1 && (
+                          <span style={{ color: lv.color, fontWeight: 600 }}>{causeName}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* 플랜 선택 */}
-          <div className="section-title">수면 코칭 플랜 선택</div>
+          <div className="section-title">추천 수면 코칭 플랜</div>
           <div className="plan-grid">
-            {[
-              { n: 1, title: '1일 플랜', sub: '빠른 응급 케어', desc: '오늘 당장 실천할 3가지' },
-              { n: 7, title: '7일 플랜', sub: '단기 집중 케어', desc: '일주일 루틴 개선' },
-              { n: 15, title: '15일 플랜', sub: '장기 자기관리', desc: '습관 정착 완전 개선' },
-            ].map(p => (
+            {PLAN_DATA.map(p => (
               <div key={p.n}
                 className="plan-btn"
                 onClick={() => handleSelectPlan(p.n)}
                 style={selectedPlan === p.n ? { borderColor: 'var(--accent)', background: 'rgba(110,231,247,0.1)' } : {}}
               >
-                <div className="plan-btn-title">{p.title}</div>
-                <div className="plan-btn-sub">{p.sub}</div>
-                <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{p.desc}</div>
+                <div style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: '28px', color: selectedPlan === p.n ? 'var(--accent)' : 'var(--accent)',
+                  lineHeight: 1, marginBottom: '2px',
+                }}>{p.days}</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>
+                  {p.label}
+                </div>
+                <div style={{
+                  fontSize: '10px', color: 'rgba(255,255,255,0.4)',
+                  lineHeight: 1.6, whiteSpace: 'pre-line',
+                }}>{p.desc}</div>
               </div>
             ))}
           </div>

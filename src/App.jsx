@@ -49,8 +49,8 @@ function App() {
     switch (screen) {
       case 'home':
         return <Home goAnalyze={goAnalyze} analysisResult={analysisResult} startCoaching={startCoaching} />;
-      case 'analyze':
-        return <Analyze backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} />;
+        case 'analyze':
+          return <Analyze backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} userName="사용자" />;
       case 'coaching':
         return <Coaching selectedPlan={selectedPlan} />;
       default:
