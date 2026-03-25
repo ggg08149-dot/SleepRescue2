@@ -112,6 +112,7 @@ app.post('/api/login', async (req, res) => {
     res.json({
       success  : true,
       token    : token,
+      userId   : user.account_id,
       userName : user.name,
       userEmail: user.email,
       message  : '로그인 성공! 🎉'
@@ -158,6 +159,47 @@ app.post('/api/predict', (req, res) => {
       console.error('❌ JSON 파싱 오류:', e);
       res.status(500).json({ error: '결과 파싱 오류', raw: stdout });
     }
+  });
+});
+
+// ─── 비밀번호 변경 API ────────────────────────
+// 주소: PUT http://localhost:7000/api/user/password
+app.put('/api/user/password', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.json({ success: false, message: '로그인이 필요합니다.' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, SECRET);
+  } catch {
+    return res.json({ success: false, message: '유효하지 않은 토큰입니다.' });
+  }
+
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.json({ success: false, message: '모든 항목을 입력해주세요.' });
+  }
+
+  db.query('SELECT * FROM tb_user WHERE user_idx = ?', [decoded.id], async (err, results) => {
+    if (err || results.length === 0) {
+      return res.json({ success: false, message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    const user = results[0];
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.json({ success: false, message: '현재 비밀번호가 틀렸습니다.' });
+    }
+
+    const hashedPw = await bcrypt.hash(newPassword, 10);
+    db.query('UPDATE tb_user SET password = ? WHERE user_idx = ?', [hashedPw, decoded.id], (err) => {
+      if (err) return res.json({ success: false, message: '비밀번호 변경에 실패했습니다.' });
+      res.json({ success: true, message: '비밀번호가 변경되었습니다.' });
+    });
   });
 });
 
