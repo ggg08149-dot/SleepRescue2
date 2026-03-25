@@ -36,11 +36,96 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const pctRef = useRef(null);
   const statusRef = useRef(null);
   const resultRef = useRef(null);
-  const toggleDrink = (drink) => {
-    setDrinks(prev =>
-      prev.includes(drink) ? prev.filter(d => d !== drink) : [...prev, drink]
-    );
+
+  // 카페인 mg 계산 함수
+  const getTotalCaffeineMg = () => {
+    if (drinks.includes('🚫 없음')) return 0;
+    
+    const caffeineMap = {
+      '☕ 아메리카노': 120,
+      '🧋 라떼': 80,
+      '⚡ 에너지음료': 160,
+      '🍵 녹차': 30
+    };
+    
+    let total = 0;
+    drinks.forEach(drink => {
+      const match = drink.match(/([☕🧋⚡🍵].*?)\s*(\d+)잔/);
+      if (match) {
+        const drinkName = match[1];
+        const count = parseInt(match[2]);
+        total += (caffeineMap[drinkName] || 0) * count;
+      }
+    });
+    
+    return total;
   };
+
+  // 버튼 클릭 시 잔 수 증가
+  const addDrink = (drinkName) => {
+    if (drinkName === '🚫 없음') {
+      setDrinks(['🚫 없음']);
+      return;
+    }
+    
+    setDrinks(prev => {
+      let newDrinks = prev.filter(d => d !== '🚫 없음');
+      const existingIndex = newDrinks.findIndex(d => d.includes(drinkName));
+      
+      if (existingIndex !== -1) {
+        const existing = newDrinks[existingIndex];
+        const match = existing.match(/(\d+)잔/);
+        const currentCount = match ? parseInt(match[1]) : 1;
+        const newCount = currentCount + 1;
+        newDrinks[existingIndex] = `${drinkName} ${newCount}잔`;
+      } else {
+        newDrinks.push(`${drinkName} 1잔`);
+      }
+      
+      return newDrinks;
+    });
+  };
+
+  // 특정 음료 제거 (잔 수 감소)
+  const removeDrink = (drinkName) => {
+    setDrinks(prev => {
+      if (prev.includes('🚫 없음')) return prev;
+      
+      const existingIndex = prev.findIndex(d => d.includes(drinkName));
+      
+      if (existingIndex !== -1) {
+        const existing = prev[existingIndex];
+        const match = existing.match(/(\d+)잔/);
+        const currentCount = match ? parseInt(match[1]) : 1;
+        
+        if (currentCount > 1) {
+          const newCount = currentCount - 1;
+          const newDrinks = [...prev];
+          newDrinks[existingIndex] = `${drinkName} ${newCount}잔`;
+          return newDrinks;
+        } else {
+          return prev.filter((_, idx) => idx !== existingIndex);
+        }
+      }
+      
+      return prev;
+    });
+  };
+
+  // 특정 음료의 현재 잔 수 가져오기
+  const getDrinkCount = (drinkName) => {
+    if (drinks.includes('🚫 없음')) return 0;
+    const drink = drinks.find(d => d.includes(drinkName));
+    if (!drink) return 0;
+    const match = drink.match(/(\d+)잔/);
+    return match ? parseInt(match[1]) : 1;
+  };
+
+  // '없음'이 선택되었는지 확인
+  const isNoneSelected = () => {
+    return drinks.includes('🚫 없음');
+  };
+
 
   const doScan = () => {
     setScanning(true);
@@ -64,65 +149,60 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   };
 
   const doAnalyze = async () => {
-  // 입력값 검증
-  if (!lifestyleData.workout || !lifestyleData.phone || 
-      !lifestyleData.workHours || !lifestyleData.relaxation) {
-    alert('운동시간, 폰 사용, 근무시간, 휴식시간을 모두 입력해주세요!');
-    return;
-  }
+    // 입력값 검증
+    if (!lifestyleData.workout || !lifestyleData.phone || 
+        !lifestyleData.workHours || !lifestyleData.relaxation) {
+      alert('운동시간, 폰 사용, 근무시간, 휴식시간을 모두 입력해주세요!');
+      return;
+    }
 
-  // 카페인 값 변환 (선택된 음료에서 추출)
-  let caffeineValue = '없음';
-  if (drinks.includes('☕ 아메리카노')) caffeineValue = '아메리카노';
-  else if (drinks.includes('🧋 라떼')) caffeineValue = '라떼';
-  else if (drinks.includes('⚡ 에너지음료')) caffeineValue = '에너지음료';
-  else if (drinks.includes('🍵 녹차')) caffeineValue = '녹차';
+    // 운동시간 분 → 시간으로 변환
+    const workoutHours = parseFloat(lifestyleData.workout) / 60;
+    // 휴식시간 분 → 시간으로 변환
+    const relaxationHours = parseFloat(lifestyleData.relaxation) / 60;
+    // ✅ 카페인 총 mg 계산
+    const caffeineMg = getTotalCaffeineMg();
 
-  // 운동시간 분 → 시간으로 변환
-  const workoutHours = parseFloat(lifestyleData.workout) / 60;
-  // 휴식시간 분 → 시간으로 변환
-  const relaxationHours = parseFloat(lifestyleData.relaxation) / 60;
-
-  try {
-    // 백엔드 API 호출
-    const response = await fetch('http://localhost:5000/api/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workout: workoutHours,
-        phone: parseFloat(lifestyleData.phone),
-        workHours: parseFloat(lifestyleData.workHours),
-        caffeine: caffeineValue,
-        relaxation: relaxationHours
-      })
-    });
-    
-    const data = await response.json();
-    
-    // 예측 결과로 피로도 계산
-    let fatigue = 'low';
-    if (data.sleep_score < 30) fatigue = 'high';
-    else if (data.sleep_score < 70) fatigue = 'mid';
-    
-    const res = {
-      darkCircle: 72,
-      sleepScore: data.predicted_hours,
-      sleepScorePoint: data.sleep_score,
-      avg3: 70,
-      fatigue: fatigue
-    };
-    
-    setResult(res);
-    updateResult(res);
-    setTimeout(() => {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-    
-  } catch (error) {
-    console.error('예측 오류:', error);
-    alert('분석 중 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.');
-  }
-};
+    try {
+      // 백엔드 API 호출 (포트 7000으로 수정!)
+      const response = await fetch('http://localhost:7000/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workout: workoutHours,
+          phone: parseFloat(lifestyleData.phone),
+          workHours: parseFloat(lifestyleData.workHours),
+          caffeine: caffeineMg,  // ✅ mg 단위로 전송!
+          relaxation: relaxationHours
+        })
+      });
+      
+      const data = await response.json();
+      
+      // 예측 결과로 피로도 계산
+      let fatigue = 'low';
+      if (data.sleep_score < 30) fatigue = 'high';
+      else if (data.sleep_score < 70) fatigue = 'mid';
+      
+      const res = {
+        darkCircle: 72,
+        sleepScore: data.predicted_hours,
+        sleepScorePoint: data.sleep_score,
+        avg3: 70,
+        fatigue: fatigue
+      };
+      
+      setResult(res);
+      updateResult(res);
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      
+    } catch (error) {
+      console.error('예측 오류:', error);
+      alert('분석 중 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.');
+    }
+  };
 
   const handleSelectPlan = (n) => {
     setSelectedPlan(n);
@@ -271,27 +351,123 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
           <div className="input-group">
           <div className="input-label">카페인 섭취량</div>
-          <div className="drink-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '5px' }}>
-            {drinkList.map(d => (
-              <div 
-                key={d} 
-                className={`drink-btn ${drinks.includes(d) ? 'sel' : ''}`} 
-                onClick={() => toggleDrink(d)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '20px',
-                  background: drinks.includes(d) ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                  color: drinks.includes(d) ? '#000' : 'rgba(255,255,255,0.7)',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  transition: 'all 0.2s ease',
-                  border: drinks.includes(d) ? 'none' : '1px solid rgba(255,255,255,0.2)'
-                }}
-              >
-                {d}
-              </div>
-            ))}
+          <div className="drink-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '12px' }}>
+            {drinkList.map(drink => {
+              const count = getDrinkCount(drink);
+              const isNone = drink === '🚫 없음';
+              const isSelected = isNone ? isNoneSelected() : count > 0;
+              
+              if (isNone) {
+                return (
+                  <button
+                    key={drink}
+                    onClick={() => addDrink(drink)}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '24px',
+                      background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+                      color: isSelected ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {drink}
+                  </button>
+                );
+              }
+              
+              return (
+                <div key={drink} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <button
+                    onClick={() => addDrink(drink)}
+                    disabled={isNoneSelected()}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '24px',
+                      background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+                      color: isSelected ? '#000' : 'rgba(255,255,255,0.7)',
+                      border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                      cursor: isNoneSelected() ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      minWidth: '100px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '8px',
+                      opacity: isNoneSelected() ? 0.5 : 1
+                    }}
+                  >
+                    <span>{drink}</span>
+                    {count > 0 && (
+                      <span style={{ 
+                        background: 'rgba(0,0,0,0.3)', 
+                        padding: '2px 8px', 
+                        borderRadius: '20px',
+                        fontSize: '12px'
+                      }}>
+                        {count}잔
+                      </span>
+                    )}
+                  </button>
+                  
+                  {count > 0 && !isNoneSelected() && (
+                    <button
+                      onClick={() => removeDrink(drink)}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'rgba(239,68,68,0.2)',
+                        border: '1px solid rgba(239,68,68,0.4)',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontSize: '18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      -
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          
+          {/* 선택된 음료 요약 표시 */}
+          {!isNoneSelected() && drinks.length > 0 && (
+            <div style={{
+              marginTop: '8px',
+              padding: '8px 12px',
+              background: 'rgba(110,231,247,0.1)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: '#6ee7f7'
+            }}>
+              📊 총 카페인: {getTotalCaffeineMg()}mg
+            </div>
+          )}
+          
+          {/* '없음' 선택 시 메시지 */}
+          {isNoneSelected() && (
+            <div style={{
+              marginTop: '8px',
+              padding: '8px 12px',
+              background: 'rgba(110,231,247,0.1)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: '#6ee7f7'
+            }}>
+              ✅ 카페인 없음 (0mg)
+            </div>
+          )}
         </div>
 
           {/* -------------------------------------- */}
