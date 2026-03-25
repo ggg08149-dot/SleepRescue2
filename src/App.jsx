@@ -23,7 +23,7 @@ function App() {
   const [screen, setScreen] = useState('home');
   const [transitioning, setTransitioning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(7);
 
   const trigTransition = (cb) => {
     setTransitioning(true);
@@ -86,7 +86,7 @@ function App() {
       case 'analyze':
         return <Analyze backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} />;
       case 'coaching':
-        return <Coaching selectedPlan={selectedPlan} />;
+        return <Coaching selectedPlan={selectedPlan} analysisResult={analysisResult} />;
       case 'mypage':
         return <MyPage userName={userName} userEmail={userEmail} onLogout={handleLogout} />;
       default:
