@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const mysql = require\\(''mysql2''\\); const db = mysql.createConnection\\({host:''project-db-campus.smhrd.com'',port:3312,user:''sc_25K_HI3_p2_2'',password:''smhrd2'',database:''sc_25K_HI3_p2_2''}\\); db.connect\\(\\(err\\)=>{ if\\(err\\){console.log\\(''연결실패:'',err.code, err.message\\);} else{console.log\\(''연결성공''\\);} db.end\\(\\); }\\);\")",
+      "Bash(curl -s http://localhost:7000/)",
+      "Bash(curl -s -X POST http://localhost:7000/api/login -H \"Content-Type: application/json\" -d \"{\"\"email\"\":\"\"test@test.com\"\",\"\"password\"\":\"\"test123\"\"}\")",
+      "Bash(timeout 8 node server.js)"
+    ]
+  }
+}
