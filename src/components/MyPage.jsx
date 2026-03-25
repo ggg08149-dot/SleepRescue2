@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout }) {
+function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId = '', onLogout }) {
 
   const [section, setSection] = useState(null);
   // section: null | 'profile' | 'account' | 'userinfo' | 'support'
@@ -8,21 +8,13 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
   const [profileImg, setProfileImg] = useState(null);
   const [toast, setToast] = useState('');
 
-  // 회원정보 수정 폼
-  const [userInfo, setUserInfo] = useState({
-    name: userName,
-    age: '',
-    gender: '',
-    email: userEmail,
-  });
-
-  // 계정설정 폼
-  const [accountForm, setAccountForm] = useState({
+  // 비밀번호 변경 폼
+  const [pwForm, setPwForm] = useState({
     currentPw: '',
-    newId: '',
     newPw: '',
     newPwConfirm: '',
   });
+
 
   const [showWithdraw, setShowWithdraw] = useState(false);
 
@@ -39,19 +31,41 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
     reader.readAsDataURL(file);
   };
 
-  const handleSaveUserInfo = () => {
-    showToast('✓ 회원정보가 저장되었습니다');
-    setSection(null);
-  };
-
-  const handleSaveAccount = () => {
-    if (accountForm.newPw && accountForm.newPw !== accountForm.newPwConfirm) {
-      showToast('⚠ 비밀번호가 일치하지 않습니다');
+  const handleChangePassword = async () => {
+    if (!pwForm.currentPw || !pwForm.newPw || !pwForm.newPwConfirm) {
+      showToast('⚠ 모든 항목을 입력해주세요');
       return;
     }
-    showToast('✓ 계정 정보가 변경되었습니다');
-    setSection(null);
+    if (pwForm.newPw !== pwForm.newPwConfirm) {
+      showToast('⚠ 새 비밀번호가 일치하지 않습니다');
+      return;
+    }
+    if (pwForm.newPw.length < 6) {
+      showToast('⚠ 비밀번호는 6자 이상이어야 합니다');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:7000/api/user/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ currentPassword: pwForm.currentPw, newPassword: pwForm.newPw }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast('✓ 비밀번호가 변경되었습니다');
+        setPwForm({ currentPw: '', newPw: '', newPwConfirm: '' });
+        setSection(null);
+      } else {
+        showToast(`⚠ ${data.message}`);
+      }
+    } catch {
+      showToast('⚠ 서버 연결에 실패했습니다');
+    }
   };
+
 
   const initials = userName.slice(0, 2).toUpperCase();
 
@@ -63,16 +77,10 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
       sub: '나를 표현하는 사진을 설정하세요',
     },
     {
-      id: 'account',
-      icon: '🔑',
-      label: '계정 설정',
-      sub: '아이디 · 비밀번호 변경',
-    },
-    {
       id: 'userinfo',
       icon: '✏️',
-      label: '회원정보 수정',
-      sub: '이름 · 나이 · 성별 · 이메일',
+      label: '비밀번호 변경',
+      sub: '비밀번호 변경',
     },
     {
       id: 'support',
@@ -99,6 +107,7 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
         </div>
         <div className="mypage-hero-info">
           <div className="mypage-hero-name">{userName}</div>
+          {userId && <div className="mypage-hero-email">아이디: {userId}</div>}
           <div className="mypage-hero-email">{userEmail}</div>
           <div className="mypage-hero-tag">수면 구조 중 🚑</div>
         </div>
@@ -166,27 +175,18 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
         </div>
       )}
 
-      {/* 계정 설정 */}
-      {section === 'account' && (
+      {/* 비밀번호 변경 */}
+      {section === 'userinfo' && (
         <div className="mypage-panel">
           <div className="mypage-form">
-            <div className="mypage-form-group">
-              <label className="mypage-form-label">새 아이디</label>
-              <input
-                className="mypage-form-input"
-                placeholder="변경할 아이디 입력"
-                value={accountForm.newId}
-                onChange={e => setAccountForm({ ...accountForm, newId: e.target.value })}
-              />
-            </div>
             <div className="mypage-form-group">
               <label className="mypage-form-label">현재 비밀번호</label>
               <input
                 type="password"
                 className="mypage-form-input"
                 placeholder="현재 비밀번호 입력"
-                value={accountForm.currentPw}
-                onChange={e => setAccountForm({ ...accountForm, currentPw: e.target.value })}
+                value={pwForm.currentPw}
+                onChange={e => setPwForm({ ...pwForm, currentPw: e.target.value })}
               />
             </div>
             <div className="mypage-form-group">
@@ -195,8 +195,8 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
                 type="password"
                 className="mypage-form-input"
                 placeholder="새 비밀번호 입력 (6자 이상)"
-                value={accountForm.newPw}
-                onChange={e => setAccountForm({ ...accountForm, newPw: e.target.value })}
+                value={pwForm.newPw}
+                onChange={e => setPwForm({ ...pwForm, newPw: e.target.value })}
               />
             </div>
             <div className="mypage-form-group">
@@ -205,61 +205,11 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', onLogout
                 type="password"
                 className="mypage-form-input"
                 placeholder="새 비밀번호 재입력"
-                value={accountForm.newPwConfirm}
-                onChange={e => setAccountForm({ ...accountForm, newPwConfirm: e.target.value })}
+                value={pwForm.newPwConfirm}
+                onChange={e => setPwForm({ ...pwForm, newPwConfirm: e.target.value })}
               />
             </div>
-            <button className="mypage-save-btn" onClick={handleSaveAccount}>변경 저장</button>
-          </div>
-        </div>
-      )}
-
-      {/* 회원정보 수정 */}
-      {section === 'userinfo' && (
-        <div className="mypage-panel">
-          <div className="mypage-form">
-            <div className="mypage-form-group">
-              <label className="mypage-form-label">이름</label>
-              <input
-                className="mypage-form-input"
-                value={userInfo.name}
-                onChange={e => setUserInfo({ ...userInfo, name: e.target.value })}
-              />
-            </div>
-            <div className="mypage-form-group">
-              <label className="mypage-form-label">나이</label>
-              <input
-                type="number"
-                className="mypage-form-input"
-                placeholder="나이 입력"
-                value={userInfo.age}
-                onChange={e => setUserInfo({ ...userInfo, age: e.target.value })}
-              />
-            </div>
-            <div className="mypage-form-group">
-              <label className="mypage-form-label">성별</label>
-              <div className="mypage-gender-row">
-                {['남성', '여성', '선택 안함'].map(g => (
-                  <button
-                    key={g}
-                    className={`mypage-gender-btn ${userInfo.gender === g ? 'mypage-gender-btn--active' : ''}`}
-                    onClick={() => setUserInfo({ ...userInfo, gender: g })}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mypage-form-group">
-              <label className="mypage-form-label">이메일</label>
-              <input
-                type="email"
-                className="mypage-form-input"
-                value={userInfo.email}
-                onChange={e => setUserInfo({ ...userInfo, email: e.target.value })}
-              />
-            </div>
-            <button className="mypage-save-btn" onClick={handleSaveUserInfo}>저장하기</button>
+            <button className="mypage-save-btn" onClick={handleChangePassword}>변경 저장</button>
           </div>
         </div>
       )}
