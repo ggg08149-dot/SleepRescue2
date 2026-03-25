@@ -24,11 +24,18 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const [drinks, setDrinks] = useState([]);
   const [result, setResult] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  // -------------------------------------------------
+  const [lifestyleData, setLifestyleData] = useState({
+    workout: '',      // 운동시간 (분)
+    phone: '',        // 폰 사용 시간 (h)
+    workHours: '',    // 근무시간 (h)
+    relaxation: ''    // 휴식시간 (h) - 낮잠
+    });
+  // ---------------------------------------------------
   const shadowRef = useRef(null);
   const pctRef = useRef(null);
   const statusRef = useRef(null);
   const resultRef = useRef(null);
-
   const toggleDrink = (drink) => {
     setDrinks(prev =>
       prev.includes(drink) ? prev.filter(d => d !== drink) : [...prev, drink]
@@ -56,19 +63,66 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     }, 1500);
   };
 
-  const doAnalyze = () => {
+  const doAnalyze = async () => {
+  // 입력값 검증
+  if (!lifestyleData.workout || !lifestyleData.phone || 
+      !lifestyleData.workHours || !lifestyleData.relaxation) {
+    alert('운동시간, 폰 사용, 근무시간, 휴식시간을 모두 입력해주세요!');
+    return;
+  }
+
+  // 카페인 값 변환 (선택된 음료에서 추출)
+  let caffeineValue = '없음';
+  if (drinks.includes('☕ 아메리카노')) caffeineValue = '아메리카노';
+  else if (drinks.includes('🧋 라떼')) caffeineValue = '라떼';
+  else if (drinks.includes('⚡ 에너지음료')) caffeineValue = '에너지음료';
+  else if (drinks.includes('🍵 녹차')) caffeineValue = '녹차';
+
+  // 운동시간 분 → 시간으로 변환
+  const workoutHours = parseFloat(lifestyleData.workout) / 60;
+  // 휴식시간 분 → 시간으로 변환
+  const relaxationHours = parseFloat(lifestyleData.relaxation) / 60;
+
+  try {
+    // 백엔드 API 호출
+    const response = await fetch('http://localhost:5000/api/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workout: workoutHours,
+        phone: parseFloat(lifestyleData.phone),
+        workHours: parseFloat(lifestyleData.workHours),
+        caffeine: caffeineValue,
+        relaxation: relaxationHours
+      })
+    });
+    
+    const data = await response.json();
+    
+    // 예측 결과로 피로도 계산
+    let fatigue = 'low';
+    if (data.sleep_score < 30) fatigue = 'high';
+    else if (data.sleep_score < 70) fatigue = 'mid';
+    
     const res = {
       darkCircle: 72,
-      sleepScore: 4.2,
+      sleepScore: data.predicted_hours,
+      sleepScorePoint: data.sleep_score,
       avg3: 70,
-      fatigue: 'high',
+      fatigue: fatigue
     };
+    
     setResult(res);
     updateResult(res);
     setTimeout(() => {
       resultRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
-  };
+    
+  } catch (error) {
+    console.error('예측 오류:', error);
+    alert('분석 중 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.');
+  }
+};
 
   const handleSelectPlan = (n) => {
     setSelectedPlan(n);
@@ -166,144 +220,240 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       <div className="input-card">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div className="input-row">
-            <div className="input-group"><div className="input-label">운동시간 (분)</div><input className="input-field" type="number" placeholder="45"/></div>
-            <div className="input-group"><div className="input-label">근무시간 (h)</div><input className="input-field" type="number" placeholder="9"/></div>
-            <div className="input-group"><div className="input-label">수면시간 (h)</div><input className="input-field" type="number" placeholder="5"/></div>
-          </div>
-          <div className="input-row">
-            <div className="input-group"><div className="input-label">폰 사용 (h)</div><input className="input-field" type="number" placeholder="6"/></div>
-            <div className="input-group"><div className="input-label">낮잠 (분)</div><input className="input-field" type="number" placeholder="0"/></div>
-            <div className="input-group"><div className="input-label">전날 수면 (h)</div><input className="input-field" type="number" placeholder="6"/></div>
-          </div>
-          <div className="input-group">
-            <div className="input-label">카페인 섭취량</div>
-            <div className="drink-row">
-              {drinkList.map(d => (
-                <div key={d} className={`drink-btn ${drinks.includes(d) ? 'sel' : ''}`} onClick={() => toggleDrink(d)}>{d}</div>
-              ))}
+            <div className="input-group">
+              <div className="input-label">운동시간 (분)</div>
+              <input 
+                className="input-field" 
+                type="number" 
+                placeholder="45"
+                value={lifestyleData.workout}
+                onChange={(e) => setLifestyleData({...lifestyleData, workout: e.target.value})}
+              />
+            </div>
+            <div className="input-group">
+              <div className="input-label">근무시간 (h)</div>
+              <input 
+                className="input-field" 
+                type="number" 
+                placeholder="9"
+                value={lifestyleData.workHours}
+                onChange={(e) => setLifestyleData({...lifestyleData, workHours: e.target.value})}
+              />
+            </div>
+            {/* 수면시간 필드는 나중에 예측 결과로 표시할 거라서 그대로 둠 */}
+            <div className="input-group">
+              <div className="input-label">수면시간 (h)</div>
+              <input className="input-field" type="number" placeholder="5" disabled/>
             </div>
           </div>
+          <div className="input-row">
+            <div className="input-group">
+              <div className="input-label">폰 사용 (h)</div>
+              <input 
+                className="input-field" 
+                type="number" 
+                placeholder="6"
+                value={lifestyleData.phone}
+                onChange={(e) => setLifestyleData({...lifestyleData, phone: e.target.value})}
+              />
+            </div>
+            <div className="input-group">
+              <div className="input-label">휴식/낮잠 (분)</div>
+              <input 
+                className="input-field" 
+                type="number" 
+                placeholder="0"
+                value={lifestyleData.relaxation}
+                onChange={(e) => setLifestyleData({...lifestyleData, relaxation: e.target.value})}
+              />
+            </div>
+            {/* 전날 수면 필드는 필요 없으니 삭제 또는 숨김 처리 */}
+            <div className="input-group">
+              <div className="input-label"> </div>
+              <input className="input-field" type="hidden" />
+            </div>
+          </div>
+          {/* -------------------------------------- */}
           <button className="analyze-btn" onClick={doAnalyze}>🔍 AI 분석 시작하기</button>
         </div>
       </div>
 
       {/* 분석 결과 */}
-      {result && (
-        <div ref={resultRef}>
+{result && (
+  <div ref={resultRef}>
 
-          {/* 피로도 분석 결과 카드 */}
-          <div style={{
-            background: 'linear-gradient(135deg, #1e1040, #2a1a5e)',
-            border: '1px solid rgba(167,139,250,0.25)',
-            borderRadius: '16px', padding: '20px', marginBottom: '14px',
+    {/* ✅ 추가: AI 수면 예측 결과 카드 */}
+    <div style={{
+      background: 'rgba(110,231,247,0.1)',
+      border: '1px solid rgba(110,231,247,0.4)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '14px',
+      textAlign: 'center'
+    }}>
+      <div style={{ 
+        fontSize: '12px', 
+        color: '#6ee7f7', 
+        marginBottom: '12px',
+        letterSpacing: '1px',
+        fontWeight: 500
+      }}>
+        🧠 AI 수면 예측 결과
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ 
+            fontSize: '42px', 
+            fontFamily: "'Bebas Neue', sans-serif", 
+            color: '#6ee7f7',
+            lineHeight: 1
           }}>
-            <div style={{ textAlign: 'center', fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: '16px', letterSpacing: '1px' }}>
-              피로도 분석 결과
-            </div>
-
-            {/* 3단계 선택 인디케이터 */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '18px' }}>
-              {FATIGUE_LEVELS.map(lv => {
-                const isActive = result.fatigue === lv.key;
-                return (
-                  <div key={lv.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                    <div style={{
-                      width: '52px', height: '52px', borderRadius: '50%',
-                      background: isActive ? lv.bg : 'rgba(255,255,255,0.04)',
-                      border: `2px solid ${isActive ? lv.border : 'rgba(255,255,255,0.1)'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '22px',
-                      boxShadow: isActive ? `0 0 14px ${lv.border}` : 'none',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      {lv.icon}
-                    </div>
-                    <div style={{
-                      fontSize: '11px', fontWeight: isActive ? 700 : 400,
-                      color: isActive ? lv.color : 'rgba(255,255,255,0.3)',
-                      transition: 'all 0.3s ease',
-                    }}>{lv.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* 피로도 레벨 뱃지 + 메시지 */}
-            {(() => {
-              const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue);
-              const causeName = '다크서클 지수 상승';
-              const msg = getFatigueMessage(result.fatigue, userName, causeName);
-              return (
-                <div style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${lv.border}`,
-                  borderRadius: '12px', padding: '14px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <span style={{
-                      background: lv.bg, border: `1px solid ${lv.border}`,
-                      color: lv.color, fontSize: '11px', fontWeight: 700,
-                      padding: '3px 10px', borderRadius: '20px',
-                    }}>{lv.label}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
-                      {userName}님의 피로 {lv.label}
-                    </span>
-                  </div>
-                  <div style={{
-                    fontSize: '12px', color: 'rgba(255,255,255,0.6)',
-                    lineHeight: 1.8, fontWeight: 300,
-                  }}>
-                    {msg.split(causeName).map((part, i, arr) => (
-                      <span key={i}>
-                        {part}
-                        {i < arr.length - 1 && (
-                          <span style={{ color: lv.color, fontWeight: 600 }}>{causeName}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+            {result.sleepScore}
           </div>
-
-          {/* 플랜 선택 */}
-          <div className="section-title">추천 수면 코칭 플랜</div>
-          <div className="plan-grid">
-            {PLAN_DATA.map(p => (
-              <div key={p.n}
-                className="plan-btn"
-                onClick={() => handleSelectPlan(p.n)}
-                style={selectedPlan === p.n ? { borderColor: 'var(--accent)', background: 'rgba(110,231,247,0.1)' } : {}}
-              >
-                <div style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: '28px', color: selectedPlan === p.n ? 'var(--accent)' : 'var(--accent)',
-                  lineHeight: 1, marginBottom: '2px',
-                }}>{p.days}</div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>
-                  {p.label}
-                </div>
-                <div style={{
-                  fontSize: '10px', color: 'rgba(255,255,255,0.4)',
-                  lineHeight: 1.6, whiteSpace: 'pre-line',
-                }}>{p.desc}</div>
-              </div>
-            ))}
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+            예상 수면시간 (시간)
           </div>
-
-          {/* 코칭 시작 버튼 */}
-          {selectedPlan && (
-            <button
-              className="analyze-btn"
-              onClick={handleStartCoaching}
-              style={{ background: 'var(--accent2)', marginTop: '4px' }}
-            >
-              💬 {selectedPlan}일 플랜으로 코칭 시작하기 →
-            </button>
-          )}
         </div>
-      )}
+        <div>
+          <div style={{ 
+            fontSize: '42px', 
+            fontFamily: "'Bebas Neue', sans-serif", 
+            color: result.sleepScorePoint >= 70 ? '#22c55e' : result.sleepScorePoint >= 30 ? '#f59e0b' : '#ef4444',
+            lineHeight: 1
+          }}>
+            {result.sleepScorePoint}
+          </div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+            수면점수 (0~100점)
+          </div>
+        </div>
+      </div>
+      <div style={{ 
+        fontSize: '10px', 
+        color: 'rgba(255,255,255,0.4)', 
+        marginTop: '12px',
+        borderTop: '1px solid rgba(110,231,247,0.2)',
+        paddingTop: '10px'
+      }}>
+        {result.sleepScorePoint >= 70 ? '✨ 양호한 수면 상태입니다!' : 
+         result.sleepScorePoint >= 30 ? '⚠️ 수면 개선이 필요합니다.' : 
+         '🔥 심각한 수면 부족 상태입니다! 당장 휴식이 필요해요!'}
+      </div>
+    </div>
+
+    {/* 피로도 분석 결과 카드 */}
+    <div style={{
+      background: 'linear-gradient(135deg, #1e1040, #2a1a5e)',
+      border: '1px solid rgba(167,139,250,0.25)',
+      borderRadius: '16px', padding: '20px', marginBottom: '14px',
+    }}>
+      <div style={{ textAlign: 'center', fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: '16px', letterSpacing: '1px' }}>
+        피로도 분석 결과
+      </div>
+
+      {/* 3단계 선택 인디케이터 */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '18px' }}>
+        {FATIGUE_LEVELS.map(lv => {
+          const isActive = result.fatigue === lv.key;
+          return (
+            <div key={lv.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '52px', height: '52px', borderRadius: '50%',
+                background: isActive ? lv.bg : 'rgba(255,255,255,0.04)',
+                border: `2px solid ${isActive ? lv.border : 'rgba(255,255,255,0.1)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '22px',
+                boxShadow: isActive ? `0 0 14px ${lv.border}` : 'none',
+                transition: 'all 0.3s ease',
+              }}>
+                {lv.icon}
+              </div>
+              <div style={{
+                fontSize: '11px', fontWeight: isActive ? 700 : 400,
+                color: isActive ? lv.color : 'rgba(255,255,255,0.3)',
+                transition: 'all 0.3s ease',
+              }}>{lv.label}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 피로도 레벨 뱃지 + 메시지 */}
+      {(() => {
+        const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue);
+        const causeName = '다크서클 지수 상승';
+        const msg = getFatigueMessage(result.fatigue, userName, causeName);
+        return (
+          <div style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${lv.border}`,
+            borderRadius: '12px', padding: '14px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{
+                background: lv.bg, border: `1px solid ${lv.border}`,
+                color: lv.color, fontSize: '11px', fontWeight: 700,
+                padding: '3px 10px', borderRadius: '20px',
+              }}>{lv.label}</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                {userName}님의 피로 {lv.label}
+              </span>
+            </div>
+            <div style={{
+              fontSize: '12px', color: 'rgba(255,255,255,0.6)',
+              lineHeight: 1.8, fontWeight: 300,
+            }}>
+              {msg.split(causeName).map((part, i, arr) => (
+                <span key={i}>
+                  {part}
+                  {i < arr.length - 1 && (
+                    <span style={{ color: lv.color, fontWeight: 600 }}>{causeName}</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+
+    {/* 플랜 선택 */}
+    <div className="section-title">추천 수면 코칭 플랜</div>
+    <div className="plan-grid">
+      {PLAN_DATA.map(p => (
+        <div key={p.n}
+          className="plan-btn"
+          onClick={() => handleSelectPlan(p.n)}
+          style={selectedPlan === p.n ? { borderColor: 'var(--accent)', background: 'rgba(110,231,247,0.1)' } : {}}
+        >
+          <div style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '28px', color: selectedPlan === p.n ? 'var(--accent)' : 'var(--accent)',
+            lineHeight: 1, marginBottom: '2px',
+          }}>{p.days}</div>
+          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>
+            {p.label}
+          </div>
+          <div style={{
+            fontSize: '10px', color: 'rgba(255,255,255,0.4)',
+            lineHeight: 1.6, whiteSpace: 'pre-line',
+          }}>{p.desc}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* 코칭 시작 버튼 */}
+    {selectedPlan && (
+      <button
+        className="analyze-btn"
+        onClick={handleStartCoaching}
+        style={{ background: 'var(--accent2)', marginTop: '4px' }}
+      >
+        💬 {selectedPlan}일 플랜으로 코칭 시작하기 →
+      </button>
+    )}
+  </div>
+)}
     </div>
   );
 }
