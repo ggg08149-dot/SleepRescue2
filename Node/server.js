@@ -4,6 +4,8 @@ const mysql   = require('mysql2');
 const cors    = require('cors');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
+const { exec } = require('child_process');
+const path = require('path');
 require('dotenv').config(); // env에 db 정보 넣어놓고 불러옴
 
 const app    = express();
@@ -114,6 +116,48 @@ app.post('/api/login', async (req, res) => {
       userEmail: user.email,
       message  : '로그인 성공! 🎉'
     });
+  });
+});
+
+
+// ─── 수면 예측 API (추가) ─────────────────────
+app.post('/api/predict', (req, res) => {
+  const { workout, phone, workHours, caffeine, relaxation } = req.body;
+  
+  console.log('📥 받은 데이터:', { workout, phone, workHours, caffeine, relaxation });
+  
+  // Python 스크립트 경로 (scripts 폴더에 있는 predict_ml.py)
+  const pythonScript = path.join(__dirname, 'scripts', 'predict_ml.py');
+  
+  const args = [
+    String(workout),
+    String(phone),
+    String(workHours),
+    String(caffeine),
+    String(relaxation)
+  ];
+  
+  console.log('🐍 실행:', `python "${pythonScript}" ${args.join(' ')}`);
+  
+  exec(`python "${pythonScript}" ${args.join(' ')}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error('❌ 실행 오류:', error);
+      console.error('stderr:', stderr);
+      return res.status(500).json({ 
+        error: '예측 실패', 
+        details: stderr || error.message 
+      });
+    }
+    
+    console.log('✅ Python 출력:', stdout);
+    
+    try {
+      const result = JSON.parse(stdout);
+      res.json(result);
+    } catch (e) {
+      console.error('❌ JSON 파싱 오류:', e);
+      res.status(500).json({ error: '결과 파싱 오류', raw: stdout });
+    }
   });
 });
 
