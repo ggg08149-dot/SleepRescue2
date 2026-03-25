@@ -240,11 +240,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                 onChange={(e) => setLifestyleData({...lifestyleData, workHours: e.target.value})}
               />
             </div>
-            {/* 수면시간 필드는 나중에 예측 결과로 표시할 거라서 그대로 둠 */}
-            <div className="input-group">
-              <div className="input-label">수면시간 (h)</div>
-              <input className="input-field" type="number" placeholder="5" disabled/>
-            </div>
           </div>
           <div className="input-row">
             <div className="input-group">
@@ -273,6 +268,32 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
               <input className="input-field" type="hidden" />
             </div>
           </div>
+
+          <div className="input-group">
+          <div className="input-label">카페인 섭취량</div>
+          <div className="drink-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '5px' }}>
+            {drinkList.map(d => (
+              <div 
+                key={d} 
+                className={`drink-btn ${drinks.includes(d) ? 'sel' : ''}`} 
+                onClick={() => toggleDrink(d)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '20px',
+                  background: drinks.includes(d) ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
+                  color: drinks.includes(d) ? '#000' : 'rgba(255,255,255,0.7)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  transition: 'all 0.2s ease',
+                  border: drinks.includes(d) ? 'none' : '1px solid rgba(255,255,255,0.2)'
+                }}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+        </div>
+
           {/* -------------------------------------- */}
           <button className="analyze-btn" onClick={doAnalyze}>🔍 AI 분석 시작하기</button>
         </div>
