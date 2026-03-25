@@ -4,6 +4,7 @@ const mysql   = require('mysql2');
 const cors    = require('cors');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
+require('dotenv').config(); // env에 db 정보 넣어놓고 불러옴
 
 const app    = express();
 const PORT   = 7000;
@@ -15,12 +16,13 @@ app.use(express.json());
 
 // ─── DB 연결 ─────────────────────────────────
 const db = mysql.createConnection({
-  host    : 'project-db-campus.smhrd.com',
-  port    : 3312,
-  user    : 'sc_25K_HI3_p2_2',
-  password: 'smhrd2',
-  database: 'sc_25K_HI3_p2_2',
+  host    : process.env.DB_HOST,
+  port    : process.env.DB_PORT,
+  user    : process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
 });
+// 기존대로 하면 db 정보 털린대서 이렇게 바꿈
 
 db.connect((err) => {
   if (err) {
