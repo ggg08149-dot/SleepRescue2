@@ -361,7 +361,15 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                 return (
                   <button
                     key={drink}
-                    onClick={() => addDrink(drink)}
+                    onClick={() => {
+                      if (isNoneSelected()) {
+                        // 이미 '없음'이 선택되어 있으면 해제 (빈 배열로)
+                        setDrinks([]);
+                      } else {
+                        // '없음' 선택
+                        setDrinks(['🚫 없음']);
+                      }
+                    }}
                     style={{
                       padding: '10px 16px',
                       borderRadius: '24px',
@@ -378,6 +386,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                   </button>
                 );
               }
+
               
               return (
                 <div key={drink} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
