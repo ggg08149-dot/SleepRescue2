@@ -14,6 +14,8 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
     newPw: '',
     newPwConfirm: '',
   });
+  const [currentPwValid, setCurrentPwValid] = useState(null); // null | true | false
+  const [pwMatch, setPwMatch] = useState(null); // null | true | false
 
 
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -29,6 +31,24 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
     const reader = new FileReader();
     reader.onload = (ev) => setProfileImg(ev.target.result);
     reader.readAsDataURL(file);
+  };
+
+  const verifyCurrentPassword = async (pw) => {
+    if (!pw) { setCurrentPwValid(null); return; }
+    try {
+      const res = await fetch('http://localhost:7000/api/user/verify-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ currentPassword: pw }),
+      });
+      const data = await res.json();
+      setCurrentPwValid(data.success);
+    } catch {
+      setCurrentPwValid(null);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -57,6 +77,8 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
       if (data.success) {
         showToast('✓ 비밀번호가 변경되었습니다');
         setPwForm({ currentPw: '', newPw: '', newPwConfirm: '' });
+        setCurrentPwValid(null);
+        setPwMatch(null);
         setSection(null);
       } else {
         showToast(`⚠ ${data.message}`);
@@ -181,13 +203,26 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
           <div className="mypage-form">
             <div className="mypage-form-group">
               <label className="mypage-form-label">현재 비밀번호</label>
-              <input
-                type="password"
-                className="mypage-form-input"
-                placeholder="현재 비밀번호 입력"
-                value={pwForm.currentPw}
-                onChange={e => setPwForm({ ...pwForm, currentPw: e.target.value })}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="password"
+                  className="mypage-form-input"
+                  placeholder="현재 비밀번호 입력"
+                  value={pwForm.currentPw}
+                  onChange={e => {
+                    setPwForm({ ...pwForm, currentPw: e.target.value });
+                    setCurrentPwValid(null);
+                  }}
+                  onBlur={e => verifyCurrentPassword(e.target.value)}
+                  style={{ paddingRight: '32px' }}
+                />
+                {currentPwValid === true && (
+                  <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#22c55e', fontSize: '18px' }}>✓</span>
+                )}
+                {currentPwValid === false && (
+                  <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#f87171', fontSize: '16px' }}>✗</span>
+                )}
+              </div>
             </div>
             <div className="mypage-form-group">
               <label className="mypage-form-label">새 비밀번호</label>
@@ -196,7 +231,11 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
                 className="mypage-form-input"
                 placeholder="새 비밀번호 입력 (6자 이상)"
                 value={pwForm.newPw}
-                onChange={e => setPwForm({ ...pwForm, newPw: e.target.value })}
+                onChange={e => {
+                  const val = e.target.value;
+                  setPwForm(prev => ({ ...prev, newPw: val }));
+                  setPwMatch(pwForm.newPwConfirm ? val === pwForm.newPwConfirm : null);
+                }}
               />
             </div>
             <div className="mypage-form-group">
@@ -206,8 +245,18 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
                 className="mypage-form-input"
                 placeholder="새 비밀번호 재입력"
                 value={pwForm.newPwConfirm}
-                onChange={e => setPwForm({ ...pwForm, newPwConfirm: e.target.value })}
+                onChange={e => {
+                  const val = e.target.value;
+                  setPwForm(prev => ({ ...prev, newPwConfirm: val }));
+                  setPwMatch(val ? pwForm.newPw === val : null);
+                }}
               />
+              {pwMatch === true && (
+                <div style={{ marginTop: '4px', fontSize: '12px', color: '#22c55e' }}>✓ 일치합니다</div>
+              )}
+              {pwMatch === false && (
+                <div style={{ marginTop: '4px', fontSize: '12px', color: '#f87171' }}>✗ 일치하지 않습니다</div>
+              )}
             </div>
             <button className="mypage-save-btn" onClick={handleChangePassword}>변경 저장</button>
           </div>
