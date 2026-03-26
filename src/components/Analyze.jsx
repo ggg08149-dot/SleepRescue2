@@ -31,10 +31,10 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const [statusMsg, setStatusMsg] = useState("준비 완료");
   // -------------------------------------------------
   const [lifestyleData, setLifestyleData] = useState({
-    workout: '',      // 운동시간 (분)
+    workout: '',      // 운동시간 (h)
     phone: '',        // 폰 사용 시간 (h)
     workHours: '',    // 근무시간 (h)
-    relaxation: ''    // 휴식시간 (h) - 낮잠
+    sleepTime: ''     // 수면시간 (h)
     });
   // ---------------------------------------------------
   const shadowRef = useRef(null);
@@ -176,17 +176,17 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
   const doAnalyze = async () => {
     // 입력값 검증
-    if (!lifestyleData.workout || !lifestyleData.phone || 
-        !lifestyleData.workHours || !lifestyleData.relaxation) {
-      alert('운동시간, 폰 사용, 근무시간, 휴식시간을 모두 입력해주세요!');
+    if (!lifestyleData.workout || !lifestyleData.phone ||
+        !lifestyleData.workHours || !lifestyleData.sleepTime) {
+      alert('운동시간, 폰 사용시간, 근무시간, 수면시간을 모두 입력해주세요!');
       return;
     }
 
-    // 운동시간 분 → 시간으로 변환
-    const workoutHours = parseFloat(lifestyleData.workout) / 60;
-    // 휴식시간 분 → 시간으로 변환
-    const relaxationHours = parseFloat(lifestyleData.relaxation) / 60;
-    // ✅ 카페인 총 mg 계산
+    // 운동시간
+    const workoutHours = parseFloat(lifestyleData.workout);
+    // 수면시간
+    const sleepHours = parseFloat(lifestyleData.sleepTime);
+    // 카페인 총 mg 계산
     const caffeineMg = getTotalCaffeineMg();
 
     try {
@@ -198,8 +198,8 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           workout: workoutHours,
           phone: parseFloat(lifestyleData.phone),
           workHours: parseFloat(lifestyleData.workHours),
-          caffeine: caffeineMg,  // ✅ mg 단위로 전송!
-          relaxation: relaxationHours
+          caffeine: caffeineMg,  // mg 단위로 전송!
+          sleepTime: sleepHours
         })
       });
       
@@ -294,13 +294,14 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       <div className="section-title">생활 패턴 입력</div>
       <div className="input-card">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div className="input-row">
+          <div className="input-row" style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
             <div className="input-group">
-              <div className="input-label">운동시간 (분)</div>
+              <div className="input-label">운동시간 (h)</div>
               <input 
                 className="input-field" 
                 type="number" 
-                placeholder="45"
+                step="0.5"
+                placeholder="1.5"
                 value={lifestyleData.workout}
                 onChange={(e) => setLifestyleData({...lifestyleData, workout: e.target.value})}
               />
@@ -316,7 +317,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
               />
             </div>
           </div>
-          <div className="input-row">
+          <div className="input-row" style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
             <div className="input-group">
               <div className="input-label">폰 사용 (h)</div>
               <input 
@@ -328,13 +329,14 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
               />
             </div>
             <div className="input-group">
-              <div className="input-label">휴식/낮잠 (분)</div>
+              <div className="input-label">수면시간 (h)</div>
               <input 
                 className="input-field" 
                 type="number" 
-                placeholder="0"
-                value={lifestyleData.relaxation}
-                onChange={(e) => setLifestyleData({...lifestyleData, relaxation: e.target.value})}
+                step="0.5"
+                placeholder="7.5"
+                value={lifestyleData.sleepTime}
+                onChange={(e) => setLifestyleData({...lifestyleData, sleepTime: e.target.value})}
               />
             </div>
             {/* 전날 수면 필드는 필요 없으니 삭제 또는 숨김 처리 */}
@@ -346,7 +348,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
           <div className="input-group">
           <div className="input-label">카페인 섭취량</div>
-          <div className="drink-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '12px' }}>
+          <div className="drink-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px', marginBottom: '12px' }}>
             {drinkList.map(drink => {
               const count = getDrinkCount(drink);
               const isNone = drink === '🚫 없음';
@@ -354,31 +356,31 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
               
               if (isNone) {
                 return (
-                  <button
-                    key={drink}
-                    onClick={() => {
-                      if (isNoneSelected()) {
-                        // 이미 '없음'이 선택되어 있으면 해제 (빈 배열로)
-                        setDrinks([]);
-                      } else {
-                        // '없음' 선택
-                        setDrinks(['🚫 없음']);
-                      }
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: '24px',
-                      background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
-                      color: isSelected ? '#000' : 'rgba(255,255,255,0.7)',
-                      border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    {drink}
-                  </button>
+                  <div key={drink} style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => {
+                        if (isNoneSelected()) {
+                          setDrinks([]);
+                        } else {
+                          setDrinks(['🚫 없음']);
+                        }
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: '24px',
+                        background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+                        color: isSelected ? '#000' : 'rgba(255,255,255,0.7)',
+                        border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        minWidth: '120px'
+                      }}
+                    >
+                      {drink}
+                    </button>
+                  </div>
                 );
               }
 
