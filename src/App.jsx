@@ -18,36 +18,44 @@ function App() {
   const [userEmail, setUserEmail] = useState(
     localStorage.getItem('userEmail') || 'user@email.com'
   );
+  const [userId, setUserId] = useState(
+    localStorage.getItem('userId') || ''
+  );
 
   const [activeTab, setActiveTab] = useState('home');
   const [screen, setScreen] = useState('home');
   const [transitioning, setTransitioning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(7);
 
   const trigTransition = (cb) => {
     setTransitioning(true);
     setTimeout(() => { cb(); setTransitioning(false); }, 350);
   };
 
-  const handleLoginSuccess = (name, email) => {
+  const handleLoginSuccess = (name, email, id) => {
     const safeName = name || '사용자';
     const safeEmail = email || 'user@email.com';
+    const safeId = id || '';
     setUserName(safeName);
     setUserEmail(safeEmail);
+    setUserId(safeId);
     setAuthScreen('app');
     localStorage.setItem('authScreen', 'app');
     localStorage.setItem('userName', safeName);
     localStorage.setItem('userEmail', safeEmail);
+    localStorage.setItem('userId', safeId);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('authScreen');
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
     setAuthScreen('login');
     setUserName('사용자');
     setUserEmail('user@email.com');
+    setUserId('');
     setScreen('home');
     setActiveTab('home');
   };
@@ -86,9 +94,9 @@ function App() {
       case 'analyze':
         return <Analyze backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} />;
       case 'coaching':
-        return <Coaching selectedPlan={selectedPlan} />;
+        return <Coaching selectedPlan={selectedPlan} analysisResult={analysisResult} />;
       case 'mypage':
-        return <MyPage userName={userName} userEmail={userEmail} onLogout={handleLogout} />;
+        return <MyPage userName={userName} userEmail={userEmail} userId={userId} onLogout={handleLogout} />;
       default:
         return <Home goAnalyze={goAnalyze} analysisResult={analysisResult} startCoaching={startCoaching} userName={userName} />;
     }

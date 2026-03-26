@@ -32,7 +32,7 @@ function Login({ goHome, goSignUp }) {
 
       if (data.success) {
         localStorage.setItem('token', data.token);
-        goHome(data.userName, data.userEmail);
+        goHome(data.userName, data.userEmail, data.userId);
       } else {
         setError(data.message);
       }
