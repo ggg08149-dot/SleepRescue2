@@ -217,7 +217,9 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         sleepScore: data.predicted_hours,
         sleepScorePoint: data.sleep_score,
         avg3: 70,
-        fatigue: fatigue
+        fatigue: fatigue,
+        fatigueCause: data.fatigue_cause || '분석 중 오류가 발생했습니다.',  // ← 피로 원인 추가
+      fatigueDetails: data.fatigue_details || []  // ← 상세 원인 추가
       };
       
       setResult(res);
@@ -591,10 +593,37 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         })}
       </div>
 
+      {/* 피로 원인 표시 (추가) */}
+      {result.fatigueCause && (
+        <div style={{
+          background: 'rgba(110,231,247,0.15)',
+          border: '1px solid rgba(110,231,247,0.3)',
+          borderRadius: '12px',
+          padding: '12px',
+          marginBottom: '12px'
+        }}>
+          <div style={{ fontSize: '12px', color: '#6ee7f7', marginBottom: '6px', fontWeight: 500 }}>
+            🔍 피로 원인 분석
+          </div>
+          <div style={{ fontSize: '13px', color: '#fff', fontWeight: 500 }}>
+            {result.fatigueCause}
+          </div>
+          {result.fatigueDetails && result.fatigueDetails.length > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              {result.fatigueDetails.map((detail, idx) => (
+                <div key={idx} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
+                  {detail}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 피로도 레벨 뱃지 + 메시지 */}
       {(() => {
         const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue);
-        const causeName = '다크서클 지수 상승';
+        const causeName = result.fatigueCause || '다크서클 지수 상승';
         const msg = getFatigueMessage(result.fatigue, userName, causeName);
         return (
           <div style={{
@@ -616,14 +645,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
               fontSize: '12px', color: 'rgba(255,255,255,0.6)',
               lineHeight: 1.8, fontWeight: 300,
             }}>
-              {msg.split(causeName).map((part, i, arr) => (
-                <span key={i}>
-                  {part}
-                  {i < arr.length - 1 && (
-                    <span style={{ color: lv.color, fontWeight: 600 }}>{causeName}</span>
-                  )}
-                </span>
-              ))}
+              {msg}
             </div>
           </div>
         );

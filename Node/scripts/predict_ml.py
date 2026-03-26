@@ -5,7 +5,10 @@ import numpy as np
 import pandas as pd
 import os
 import math
+import io
 import re
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # =====================================================
 # 1. 상수 정의
@@ -62,7 +65,87 @@ def get_asymmetric_sleep_score(predicted_hours):
     return round(score, 1)
 
 # =====================================================
-# 5. 카페인 변환 함수
+# 5. 피로 원인 분석 함수 (추가)
+# =====================================================
+def analyze_fatigue_cause(workout, phone, work_hours, caffeine, relaxation, sleep_score):
+    causes = []
+    
+    # 변수 중요도 기반 분석
+    if phone > 5:
+        causes.append(f"📱 하루 {phone:.1f}시간 폰 사용")
+        if phone > 7:
+            causes.append("   → 수면 시간을 1.5시간 이상 단축시킬 수 있습니다.")
+        elif phone > 5:
+            causes.append("   → 취침 전 블루라이트가 멜라토닌 분비를 방해합니다.")
+    
+    if work_hours > 9:
+        causes.append(f"💼 하루 {work_hours:.1f}시간 근무 (과로)")
+        causes.append("   → 과로로 인한 스트레스가 수면의 질을 저하시킵니다.")
+    elif work_hours > 8:
+        causes.append(f"💼 하루 {work_hours:.1f}시간 근무")
+        causes.append("   → 업무 스트레스로 인해 숙면에 어려움을 겪을 수 있습니다.")
+    
+    if workout < 0.5:
+        causes.append(f"🏃 운동 부족 (하루 {workout:.1f}시간)")
+        causes.append("   → 규칙적인 운동은 수면의 질을 30% 이상 향상시킵니다.")
+    elif workout > 1.5:
+        causes.append(f"🏃 적절한 운동 (하루 {workout:.1f}시간)")
+        causes.append("   → 좋은 수면 습관을 유지하고 있습니다.")
+    
+    if relaxation < 0.5:
+        causes.append(f"😌 휴식 시간 부족 (하루 {relaxation:.1f}시간)")
+        causes.append("   → 스트레스 해소 시간이 필요합니다.")
+    elif relaxation > 1:
+        causes.append(f"😌 충분한 휴식 시간 (하루 {relaxation:.1f}시간)")
+        causes.append("   → 스트레스 관리가 잘 되고 있습니다.")
+    
+    if caffeine > 200:
+        causes.append(f"☕ 과도한 카페인 섭취 ({caffeine:.0f}mg)")
+        causes.append("   → 오후 3시 이후 카페인 섭취는 수면을 방해합니다.")
+    elif caffeine > 100:
+        causes.append(f"☕ 카페인 섭취 ({caffeine:.0f}mg)")
+        causes.append("   → 취침 6시간 전까지 카페인 섭취를 줄이는 것이 좋습니다.")
+    
+    # 수면 점수 기반 분석
+    if sleep_score < 30:
+        causes.append(f"😴 심각한 수면 부족 (수면 점수 {sleep_score}점)")
+        causes.append("   → 즉각적인 수면 패턴 개선이 필요합니다.")
+    elif sleep_score < 70:
+        causes.append(f"⚠️ 수면 개선 필요 (수면 점수 {sleep_score}점)")
+        causes.append("   → 규칙적인 수면 습관이 필요합니다.")
+    
+    # 종합 원인 요약
+    if len(causes) == 0:
+        return "모든 항목이 양호한 상태입니다. 현재 생활 패턴을 유지하세요."
+    
+    # 주요 원인 추출
+    main_causes = []
+    if phone > 5:
+        main_causes.append("폰 사용 시간")
+    if work_hours > 8:
+        main_causes.append("근무 시간")
+    if workout < 0.5:
+        main_causes.append("운동 부족")
+    if relaxation < 0.5:
+        main_causes.append("휴식 부족")
+    if caffeine > 100:
+        main_causes.append("카페인 섭취")
+    
+    if len(main_causes) >= 2:
+        summary = f"{', '.join(main_causes[:2])} 등이 피로의 주요 원인입니다."
+    elif len(main_causes) == 1:
+        summary = f"{main_causes[0]}이(가) 피로의 주요 원인입니다."
+    else:
+        summary = "수면 패턴 개선이 필요합니다."
+    
+    # 상세 원인과 함께 반환
+    return {
+        "summary": summary,
+        "details": causes
+    }
+
+# =====================================================
+# 6. 카페인 변환 함수
 # =====================================================
 def get_caffeine_mg(caffeine_inputs):
     if isinstance(caffeine_inputs, str):
@@ -93,7 +176,7 @@ def get_caffeine_mg(caffeine_inputs):
     return total
 
 # =====================================================
-# 6. 입력 유효성 검사
+# 7. 입력 유효성 검사
 # =====================================================
 def validate_inputs(workout, phone, work_hours, user_sleep):
     labels = {
@@ -110,7 +193,7 @@ def validate_inputs(workout, phone, work_hours, user_sleep):
             raise ValueError(f"⚠️ '{name}'이(가) 24시간을 초과했습니다. (입력값: {val}h)")
 
 # =====================================================
-# 7. 입력 처리 (운동, 폰, 근무, 카페인, 수면시간)
+# 8. 입력 처리 (운동, 폰, 근무, 카페인, 수면시간)
 # =====================================================
 mode = "json"
 
@@ -146,7 +229,7 @@ else:
         handle_error(str(e), mode="interactive")
 
 # =====================================================
-# 8. 유효성 검사 실행
+# 9. 유효성 검사 실행
 # =====================================================
 try:
     validate_inputs(workout, phone, work_hours, user_sleep)
@@ -154,17 +237,14 @@ except ValueError as e:
     handle_error(str(e), mode=mode)
 
 # =====================================================
-# 9. 휴식시간 자동 계산
+# 10. 휴식시간 자동 계산
 # =====================================================
-# 휴식시간 = 24 - (운동 + 폰 + 근무 + 사용자 수면시간)
 relaxation = 24 - (workout + phone + work_hours + user_sleep)
 relaxation = max(0, relaxation)
 
 # =====================================================
-# 10. 예측 수면시간 구하기
-# 입력: 운동, 폰, 근무, 카페인, 휴식시간(계산값)
+# 11. 예측 수면시간 구하기
 # =====================================================
-# 🔍 디버깅용 출력 (서버 로그에서 확인)
 print(f"🔍 디버그 - 운동:{workout}, 폰:{phone}, 근무:{work_hours}, 카페인:{caffeine}mg, 수면:{user_sleep}, 휴식:{relaxation}", file=sys.stderr)
 
 input_data = pd.DataFrame([{
@@ -176,12 +256,15 @@ input_data = pd.DataFrame([{
 }])
 
 predicted_hours = round(float(model.predict(input_data)[0]), 1)
-
-# 수면 점수 계산
 sleep_score = get_asymmetric_sleep_score(predicted_hours)
 
 # =====================================================
-# 11. 결과 출력
+# 12. 피로 원인 분석
+# =====================================================
+fatigue_analysis = analyze_fatigue_cause(workout, phone, work_hours, caffeine, relaxation, sleep_score)
+
+# =====================================================
+# 13. 결과 출력
 # =====================================================
 if mode == "json":
     result = {
@@ -190,7 +273,9 @@ if mode == "json":
         "predicted_hours": predicted_hours,
         "relaxation": round(relaxation, 2),
         "caffeine_mg": caffeine,
-        "sleep_score": sleep_score
+        "sleep_score": sleep_score,
+        "fatigue_cause": fatigue_analysis["summary"],
+        "fatigue_details": fatigue_analysis["details"]
     }
     print(json.dumps(result, ensure_ascii=False))
 else:
@@ -208,6 +293,9 @@ else:
     print(f"\n[예측 결과]")
     print(f"  AI 권장 수면: {predicted_hours}시간")
     print(f"  수면 점수: {sleep_score}점")
+    print(f"\n[피로 원인 분석]")
+    print(f"  {fatigue_analysis['summary']}")
+    print(f"\n[상세 분석]")
+    for detail in fatigue_analysis['details']:
+        print(f"  {detail}")
     print("=" * 50)
-
-    # python Node/scripts/predict_ml.py (운동시간) (폰 사용시간) (근무시간) (카페인) (수면시간)
