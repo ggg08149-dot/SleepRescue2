@@ -123,9 +123,14 @@ app.post('/api/login', async (req, res) => {
 
 // ─── 수면 예측 API (추가) ─────────────────────
 app.post('/api/predict', (req, res) => {
-  const { workout, phone, workHours, caffeine, relaxation } = req.body;
+  const { workout, phone, workHours, caffeine, sleepTime } = req.body;  // ← relaxation → sleepTime
   
-  console.log('📥 받은 데이터:', { workout, phone, workHours, caffeine, relaxation });
+  console.log('📥 받은 데이터:', { workout, phone, workHours, caffeine, sleepTime });
+  
+  // 휴식시간 자동 계산 (추가)
+  const relaxation = 24 - (workout + phone + workHours + sleepTime);
+  
+  console.log('📐 자동 계산된 휴식시간:', relaxation);
   
   // Python 스크립트 경로 (scripts 폴더에 있는 predict_ml.py)
   const pythonScript = path.join(__dirname, 'scripts', 'predict_ml.py');
@@ -135,7 +140,7 @@ app.post('/api/predict', (req, res) => {
     String(phone),
     String(workHours),
     String(caffeine),
-    String(relaxation)
+    String(relaxation)  // ← relaxation 전달
   ];
   
   console.log('🐍 실행:', `python "${pythonScript}" ${args.join(' ')}`);
