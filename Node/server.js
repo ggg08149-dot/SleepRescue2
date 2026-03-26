@@ -162,6 +162,27 @@ app.post('/api/predict', (req, res) => {
   });
 });
 
+// ─── 현재 비밀번호 확인 API ──────────────────
+// 주소: POST http://localhost:7000/api/user/verify-password
+app.post('/api/user/verify-password', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.json({ success: false });
+
+  let decoded;
+  try { decoded = jwt.verify(token, SECRET); }
+  catch { return res.json({ success: false }); }
+
+  const { currentPassword } = req.body;
+  if (!currentPassword) return res.json({ success: false });
+
+  db.query('SELECT password FROM tb_user WHERE user_idx = ?', [decoded.id], async (err, results) => {
+    if (err || results.length === 0) return res.json({ success: false });
+    const isMatch = await bcrypt.compare(currentPassword, results[0].password);
+    res.json({ success: isMatch });
+  });
+});
+
 // ─── 비밀번호 변경 API ────────────────────────
 // 주소: PUT http://localhost:7000/api/user/password
 app.put('/api/user/password', async (req, res) => {
