@@ -259,18 +259,65 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
       {/* 웹캠 영역 */}
       <div className="cam-box-big">
-        <div className="cam-preview"style={{ position: 'relative', overflow: 'hidden', background: '#000', borderRadius: '12px' }}>
+        
+        {/* 1. 카메라 상단 메인 안내 문구 (카메라 외부로 이동) */}
+        {!scanned && !scanning && (
+          <div style={{ 
+            textAlign: 'center', 
+            marginBottom: '15px', 
+            padding: '10px',
+            background: 'rgba(110, 231, 247, 0.1)', // 살짝 하늘색 배경
+            borderRadius: '8px',
+            border: '1px solid rgba(110, 231, 247, 0.3)'
+          }}>
+            <h3 style={{ color: '#6ee7f7', margin: '0 0 5px 0', fontSize: '18px' }}>
+              💡 오늘의 피로도 측정을 시작합니다
+            </h3>
+            <p style={{ color: '#eee', fontSize: '14px', margin: 0, lineHeight: '1.4' }}>
+              정확한 분석을 위해 <strong>얼굴을 가이드라인</strong>에 맞춰주세요!
+            </p>
+          </div>
+        )}
 
+        <div className="cam-preview" style={{ position: 'relative', overflow: 'hidden', background: '#000', borderRadius: '12px' }}>
+          
           {/* 상황1. 촬영 전 (실시간 웹캠) */}
           {!scanned && !scanning && (
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
               <Webcam
                 audio={false}
-                ref={webcamRef} // 👈 이게 있어야 doScan에서 인식합니다!
+                ref={webcamRef}
                 screenshotFormat="image/jpeg"
                 videoConstraints={{ facingMode: "user" }}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
-            )}
+
+              {/* 가이드라인 SVG (텍스트 제외, 가이드만 유지) */}
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                <svg width="100%" height="100%" viewBox="0 0 400 300" style={{ fill: 'rgba(0,0,0,0.5)' }}>
+                  <defs>
+                    <mask id="hole-mask">
+                      <rect width="400" height="300" fill="white" />
+                      <ellipse cx="200" cy="150" rx="100" ry="130" fill="black" />
+                    </mask>
+                  </defs>
+                  <rect width="400" height="300" mask="url(#hole-mask)" />
+                  {/* 눈밑 점선 가이드 */}
+                  <ellipse cx="160" cy="150" rx="20" ry="6" fill="none" stroke="#6ee7f7" strokeWidth="1" strokeDasharray="3,3" />
+                  <ellipse cx="240" cy="150" rx="20" ry="6" fill="none" stroke="#6ee7f7" strokeWidth="1" strokeDasharray="3,3" />
+                </svg>
+              </div>
+
+              {/* 조명 주의사항은 카메라 하단 내부에 작게 유지 (선택사항) */}
+              <div style={{
+                position: 'absolute', bottom: '15px', width: '100%',
+                textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '11px',
+                textShadow: '0 1px 4px #000'
+              }}>
+                ⚠️ 어둡고 조명이 수직으로 내려오는 곳에서는<br /> 그림자가 다크서클로 보일 수 있으므로, 밝은 장소에서 촬영해주세요.
+              </div>
+            </div>
+          )}
 
           {/* 상황2: 분석 중(로딩 화면) */}
           {scanning && (
