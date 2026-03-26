@@ -536,7 +536,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
             {result.sleepScore}
           </div>
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-            예상 수면시간 (시간)
+            예상 수면시간 (h)
           </div>
         </div>
         <div>

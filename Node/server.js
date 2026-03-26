@@ -123,46 +123,39 @@ app.post('/api/login', async (req, res) => {
 
 // ─── 수면 예측 API (추가) ─────────────────────
 app.post('/api/predict', (req, res) => {
-  const { workout, phone, workHours, caffeine, sleepTime } = req.body;  // ← relaxation → sleepTime
-  
-  console.log('📥 받은 데이터:', { workout, phone, workHours, caffeine, sleepTime });
-  
-  // 휴식시간 자동 계산 (추가)
-  const relaxation = 24 - (workout + phone + workHours + sleepTime);
-  
-  console.log('📐 자동 계산된 휴식시간:', relaxation);
-  
-  // Python 스크립트 경로 (scripts 폴더에 있는 predict_ml.py)
+  // 1. 프론트에서 보낸 값들을 숫자로 바꿉니다. (값이 없으면 0)
+  const workout = parseFloat(req.body.workout) || 0;
+  const phone = parseFloat(req.body.phone) || 0;
+  const workHours = parseFloat(req.body.workHours) || 0;
+  const caffeine = parseFloat(req.body.caffeine) || 0;
+  const sleepTime = parseFloat(req.body.sleepTime) || 0;
+
   const pythonScript = path.join(__dirname, 'scripts', 'predict_ml.py');
-  
+
+  // 2. 파이썬 코드의 sys.argv 순서에 맞게 5개를 배열로 만듭니다.
+  // [1:운동, 2:폰, 3:근무, 4:카페인, 5:수면시간]
   const args = [
     String(workout),
     String(phone),
     String(workHours),
     String(caffeine),
-    String(relaxation)  // ← relaxation 전달
+    String(sleepTime)
   ];
-  
-  console.log('🐍 실행:', `python "${pythonScript}" ${args.join(' ')}`);
-  
+
+  console.log(`🐍 파이썬 실행: python "${pythonScript}" ${args.join(' ')}`);
+
   exec(`python "${pythonScript}" ${args.join(' ')}`, (error, stdout, stderr) => {
     if (error) {
       console.error('❌ 실행 오류:', error);
-      console.error('stderr:', stderr);
-      return res.status(500).json({ 
-        error: '예측 실패', 
-        details: stderr || error.message 
-      });
+      return res.status(500).json({ error: 'AI 분석 중 오류가 발생했습니다.' });
     }
-    
-    console.log('✅ Python 출력:', stdout);
-    
+
     try {
-      const result = JSON.parse(stdout);
-      res.json(result);
+      const result = JSON.parse(stdout.trim());
+      res.json(result); // 파이썬이 계산한 결과(휴식시간 포함)를 리액트로 보냄
     } catch (e) {
       console.error('❌ JSON 파싱 오류:', e);
-      res.status(500).json({ error: '결과 파싱 오류', raw: stdout });
+      res.status(500).json({ error: '결과 데이터 처리 오류' });
     }
   });
 });
