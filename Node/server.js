@@ -43,10 +43,10 @@ app.get('/', (req, res) => {
 // ─── 회원가입 API ────────────────────────────
 // 주소: POST http://localhost:8080/api/signup
 app.post('/api/signup', async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, birthdate, gender } = req.body;
 
   // 입력값 확인
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !birthdate || !gender) {
     return res.json({ success: false, message: '모든 항목을 입력해주세요.' });
   }
 
@@ -55,7 +55,7 @@ app.post('/api/signup', async (req, res) => {
     const hashedPw = await bcrypt.hash(password, 10);
 
     const sql = 'INSERT INTO tb_user (account_id, name, email, password, gender, birthdate, role) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    db.query(sql, [email, name, email, hashedPw, 'M', '1999/01/01', 'user'], (err, result) => {
+    db.query(sql, [email, name, email, hashedPw, gender, birthdate, 'user'], (err, result) => {
       if (err) {
         // 이메일 중복
         if (err.code === 'ER_DUP_ENTRY') {
