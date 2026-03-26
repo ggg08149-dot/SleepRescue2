@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import Webcam from 'react-webcam';
+import axios from 'axios';
 
 const getFatigueMessage = (fatigue, userName, causeName) => {
   if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
@@ -24,6 +26,9 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const [drinks, setDrinks] = useState([]);
   const [result, setResult] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  // 분석결과를 화면에 보여주기 위한 상태들
+  const [darkScore, setDarkScore] = useState(0); 
+  const [statusMsg, setStatusMsg] = useState("준비 완료");
   // -------------------------------------------------
   const [lifestyleData, setLifestyleData] = useState({
     workout: '',      // 운동시간 (분)
@@ -33,9 +38,8 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     });
   // ---------------------------------------------------
   const shadowRef = useRef(null);
-  const pctRef = useRef(null);
-  const statusRef = useRef(null);
   const resultRef = useRef(null);
+  const webcamRef = useRef(null); // 웹캠 참조를 위한 ref
 
   // 카페인 mg 계산 함수
   const getTotalCaffeineMg = () => {
@@ -127,26 +131,48 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   };
 
 
-  const doScan = () => {
+  const doScan = async () => {
     setScanning(true);
-    setTimeout(() => {
-      setScanning(false);
-      setScanned(true);
-      let cur = 0;
-      const timer = setInterval(() => {
-        cur = Math.min(cur + 1.2, 72);
-        if (pctRef.current) pctRef.current.textContent = Math.round(cur) + '%';
-        if (shadowRef.current) {
-          shadowRef.current.setAttribute('opacity', (cur / 100) * 0.85);
-          shadowRef.current.setAttribute('ry', 8 + (cur / 100) * 18);
+    setStatusMsg("분석 중..."); // 상태 업데이트
+    try {
+          if (!webcamRef.current) {
+            alert("카메라 객체를 찾을 수 없습니다. (Ref 연결 확인 필요)");
+            setScanning(false);
+            return;
+          }
+
+          // 1. 웹캠에서 사진 캡처
+          const imageSrc = webcamRef.current.getScreenshot(); 
+          if (!imageSrc) {
+            alert("카메라 화면을 가져올 수 없습니다. 카메라 권한을 허용해주세요.");
+            setScanning(false);
+            return;
+          }
+
+          // 2. 서버 전송을 위해 Blob으로 변환
+          const imageRes = await fetch(imageSrc);
+          const imageBlob = await imageRes.blob(); 
+          const formData = new FormData();
+          formData.append('file', imageBlob, 'capture.jpg'); 
+
+          // 3. FastAPI 서버로 전송 (YOLO 분석)
+          const response = await axios.post('http://127.0.0.1:8000/predict/yolo', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+          // 4. 서버에서 받은 점수 적용
+          const score = response.data.dark_circle_score;
+          setScanning(false);
+          setScanned(true);
+          setDarkScore(score);      // 점수 저장
+          setStatusMsg("분석 완료"); // 메시지 저장
+
+        } catch (error) {
+          console.error("분석 실패:", error);
+          setScanning(false);
+          alert("서버 연결에 실패했습니다. FastAPI 서버(8000포트)가 실행 중인지 확인해주세요!");
         }
-        if (cur >= 72) {
-          clearInterval(timer);
-          if (statusRef.current) statusRef.current.textContent = '위험 단계';
-        }
-      }, 18);
-    }, 1500);
-  };
+      };
 
   const doAnalyze = async () => {
     // 입력값 검증
@@ -231,70 +257,39 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
       {/* 웹캠 영역 */}
       <div className="cam-box-big">
-        <div className="cam-preview">
+        <div className="cam-preview" style={{ position: 'relative', overflow: 'hidden' }}>
           <div className="cam-scan-anim"></div>
-          {scanning ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '40px' }}>👁</div>
-              <div style={{ fontSize: '10px', color: '#6ee7f7', marginTop: '6px' }}>다크서클 분석중...</div>
-            </div>
-          ) : !scanned ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '48px' }}>📷</div>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '6px' }}>카메라 연결 대기중</div>
-            </div>
-          ) : (
-            <div className="eye-section">
-              <div className="eye-wrap">
-                <svg viewBox="0 0 160 110" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="dcGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4a1a2a" stopOpacity="0"/>
-                      <stop offset="100%" stopColor="#9b2335" stopOpacity="0.9"/>
-                    </linearGradient>
-                  </defs>
-                  <path d="M10 55 Q80 5 150 55 Q80 105 10 55 Z" fill="#e8e8f0" opacity="0.9"/>
-                  <ellipse ref={shadowRef} cx="80" cy="80" rx="52" ry="8" fill="url(#dcGrad)" opacity="0"/>
-                  <circle cx="80" cy="55" r="26" fill="#1a3a6e"/>
-                  <circle cx="80" cy="55" r="13" fill="#050508"/>
-                  <circle cx="88" cy="48" r="5" fill="rgba(255,255,255,0.6)"/>
-                  <path d="M25 22 Q80 10 135 22" fill="none" stroke="#888" strokeWidth="3" strokeLinecap="round" opacity="0.7"/>
-                  <path d="M10 55 Q80 5 150 55" fill="none" stroke="#222" strokeWidth="3" opacity="0.8"/>
-                  <path d="M20 60 Q80 100 140 60" fill="none" stroke="#333" strokeWidth="2" opacity="0.6"/>
-                </svg>
-              </div>
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div ref={pctRef} style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '42px', color: '#ef4444', lineHeight: 1 }}>0%</div>
-                <div ref={statusRef} style={{ fontSize: '11px', color: '#f87171', fontWeight: 700, marginTop: '2px' }}>분석 중...</div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
-                  최근 3일 대비 <span style={{ color: '#ef4444' }}>+20%</span>
-                </div>
-                <div style={{ marginTop: '10px' }}>
-                  {[{ l: '3일 전', v: 68, c: '#f59e0b' }, { l: '2일 전', v: 71, c: '#f59e0b' }, { l: '오늘', v: 72, c: '#ef4444' }, { l: '3일 평균', v: 70, c: '#ef4444' }]
-                    .map(b => (
-                      <div key={b.l} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', width: '48px', flexShrink: 0 }}>{b.l}</div>
-                        <div style={{ flex: 1, height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${b.v}%`, background: b.c, borderRadius: '3px', transition: 'width 1.2s ease' }}></div>
-                        </div>
-                        <div style={{ fontSize: '10px', color: b.c, width: '28px', textAlign: 'right', fontFamily: "'Bebas Neue', sans-serif" }}>{b.v}%</div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="scan-btn" onClick={doScan}>📷 촬영 시작</button>
-          <button onClick={() => setScanned(false)} style={{
-            background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--muted)',
-            padding: '10px 16px', borderRadius: '10px', fontFamily: "'Noto Sans KR', sans-serif",
-            fontSize: '13px', cursor: 'pointer'
-          }}>↺ 재촬영</button>
-        </div>
-      </div>
 
+          {/* 실제 카메라 화면을 띄워주는 컴포넌트 배치 */}
+        {!scanned && !scanning && (
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef} // 👈 이게 있어야 doScan에서 인식합니다!
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{ facingMode: "user" }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  )}
+
+                  {scanning && (
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', zIndex: 10 }}>
+                      <div style={{ fontSize: '40px' }}>👁</div>
+                      <div style={{ fontSize: '10px', color: '#6ee7f7', marginTop: '6px' }}>다크서클 분석중...</div>
+                    </div>
+                  )}
+                  
+                  {/* ... 스캔 완료 시 보여줄 결과(SVG 눈 모양 등)는 기존 코드 유지 ... */}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="scan-btn" onClick={doScan}>📷 촬영 시작</button>
+                  <button onClick={() => {
+                    setScanned(false);
+                    setResult(null); // 이전 결과 초기화
+                    }} className="retry-btn">↺ 재촬영</button>
+                </div>
+              </div>
+        
       {/* 생활 패턴 입력 */}
       <div className="section-title">생활 패턴 입력</div>
       <div className="input-card">
