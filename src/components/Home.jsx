@@ -1,17 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const calData = {
-  1:'bad',2:'warn',3:'good',4:'good',5:'warn',
-  6:'good',7:'bad',8:'warn',9:'good',10:'good',
-  11:'warn',12:'bad',13:'bad',14:'good',15:'good',
-  16:'warn',17:'today'
-};
-const calScores = {
-  1:'72',2:'65',3:'58',4:'55',5:'61',
-  6:'52',7:'70',8:'63',9:'56',10:'54',
-  11:'68',12:'74',13:'71',14:'59',15:'51',16:'66'
-};
-
 const getFatigueEmoji = (fatigue) => {
   if (fatigue === 'high') return { emoji: '😵', label: '위험', color: '#ef4444' };
   if (fatigue === 'mid') return { emoji: '😟', label: '주의', color: '#f59e0b' };
@@ -24,6 +12,34 @@ const DEFAULT_MISSIONS = [
   { id: 3, text: '취침 전 스팀 온열 안대 10분' },
 ];
 
+const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+
+const generateCalData = (year, month) => {
+  const days = getDaysInMonth(year, month);
+  const today = new Date();
+  const todayYear  = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const todayDate  = today.getDate();
+  const isCurrentMonth = todayYear === year && todayMonth === month;
+  const isPastMonth = year < todayYear || (year === todayYear && month < todayMonth);
+  const data   = {};
+  const scores = {};
+  const types     = ['good', 'good', 'warn', 'bad', 'good', 'warn'];
+  const scoreList = ['51','52','54','55','56','58','59','61','63','65','66','68','70','71','72','74'];
+  for (let d = 1; d <= days; d++) {
+    if (isCurrentMonth && d === todayDate) {
+      data[d] = 'today';
+    } else if (isCurrentMonth && d < todayDate) {
+      data[d] = types[d % types.length];
+      scores[d] = scoreList[d % scoreList.length];
+    } else if (isPastMonth) {
+      data[d] = types[d % types.length];
+      scores[d] = scoreList[d % scoreList.length];
+    }
+  }
+  return { data, scores };
+};
+
 function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자' }) {
   const arcRef = useRef(null);
   const numRef = useRef(null);
@@ -33,6 +49,26 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   const [streak, setStreak] = useState(5);
   const [missionChecks, setMissionChecks] = useState([false, false, false]);
   const [missionSaved, setMissionSaved] = useState(false);
+
+  const today = new Date();
+  const [calYear, setCalYear]     = useState(today.getFullYear());
+  const [calMonth, setCalMonth]   = useState(today.getMonth());
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const { data: calData, scores: calScores } = generateCalData(calYear, calMonth);
+  const firstDay    = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = getDaysInMonth(calYear, calMonth);
+  const monthLabel  = `${calYear}.${String(calMonth + 1).padStart(2, '0')}`;
+
+  const goPrevMonth = () => {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+  };
+
+  const goNextMonth = () => {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
+  };
 
   const fatigue = analysisResult?.fatigue || 'high';
   const fatigueInfo = getFatigueEmoji(fatigue);
@@ -72,7 +108,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   const maxS = Math.max(...scores);
   const days = ['월','화','수','목','금','토','일'];
   const calDays = ['일','월','화','수','목','금','토'];
-  const firstDay = new Date(2026, 2, 1).getDay();
 
   return (
     <div className="home-screen">
@@ -118,7 +153,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       {/* 데일리 위젯 */}
       <div className="section-title">DAILY MISSION</div>
       <div className="daily-widget">
-        {/* 연속 달성 스트릭 */}
         <div className="streak-row">
           <div className="streak-fire-wrap">
             <span style={{
@@ -145,7 +179,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
               </div>
             </div>
           </div>
-
           <div style={{ flex: 1, marginLeft: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '5px' }}>
               <span>오늘 미션</span>
@@ -163,35 +196,26 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
           </div>
         </div>
 
-        {/* 미션 목록 */}
         <div style={{ margin: '12px 0 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {DEFAULT_MISSIONS.map((mission, idx) => (
-            <div
-              key={mission.id}
-              onClick={() => toggleMission(idx)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '10px 12px',
-                background: missionChecks[idx] ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${missionChecks[idx] ? 'rgba(110,231,247,0.2)' : 'var(--border)'}`,
-                borderRadius: '10px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
+            <div key={mission.id} onClick={() => toggleMission(idx)} style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '10px 12px',
+              background: missionChecks[idx] ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${missionChecks[idx] ? 'rgba(110,231,247,0.2)' : 'var(--border)'}`,
+              borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s ease',
+            }}>
               <div style={{
                 width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
                 border: `1.5px solid ${missionChecks[idx] ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
                 background: missionChecks[idx] ? 'var(--accent)' : 'transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '11px', color: '#0b0b13', fontWeight: 700,
-                transition: 'all 0.2s ease',
+                fontSize: '11px', color: '#0b0b13', fontWeight: 700, transition: 'all 0.2s ease',
               }}>
                 {missionChecks[idx] && '✓'}
               </div>
               <span style={{
-                fontSize: '12px',
-                flex: 1,
+                fontSize: '12px', flex: 1,
                 textDecoration: missionChecks[idx] ? 'line-through' : 'none',
                 color: missionChecks[idx] ? 'rgba(255,255,255,0.35)' : 'var(--text)',
                 transition: 'all 0.2s ease',
@@ -202,33 +226,25 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
           ))}
         </div>
 
-        {/* 하단 버튼 */}
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={saveMissions}
-            disabled={missionSaved}
-            style={{
-              background: missionSaved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${missionSaved ? 'rgba(34,197,94,0.35)' : 'var(--border)'}`,
-              color: missionSaved ? '#22c55e' : 'var(--muted)',
-              padding: '9px 16px', borderRadius: '9px', fontSize: '12px',
-              cursor: missionSaved ? 'default' : 'pointer',
-              fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.3s ease',
-            }}
-          >
+          <button onClick={saveMissions} disabled={missionSaved} style={{
+            background: missionSaved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${missionSaved ? 'rgba(34,197,94,0.35)' : 'var(--border)'}`,
+            color: missionSaved ? '#22c55e' : 'var(--muted)',
+            padding: '9px 16px', borderRadius: '9px', fontSize: '12px',
+            cursor: missionSaved ? 'default' : 'pointer',
+            fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.3s ease',
+          }}>
             {missionSaved ? '✓ 저장됨' : '저장하기'}
           </button>
-          <button
-            onClick={() => startCoaching && startCoaching(7)}
-            style={{
-              flex: 1,
-              background: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(110,231,247,0.08))',
-              border: '1px solid rgba(167,139,250,0.25)',
-              color: 'var(--accent2)', padding: '9px 14px', borderRadius: '9px',
-              fontSize: '12px', cursor: 'pointer',
-              fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.2s ease',
-            }}
-          >
+          <button onClick={() => startCoaching && startCoaching(7)} style={{
+            flex: 1,
+            background: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(110,231,247,0.08))',
+            border: '1px solid rgba(167,139,250,0.25)',
+            color: 'var(--accent2)', padding: '9px 14px', borderRadius: '9px',
+            fontSize: '12px', cursor: 'pointer',
+            fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.2s ease',
+          }}>
             💬 지금 바로 오늘의 수면 미션을 확인하세요! →
           </button>
         </div>
@@ -277,9 +293,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
               const pct = (s / maxS * 100).toFixed(0);
               const isToday = i === 6;
               const bc = isToday ? '#6ee7f7' : s >= 6.5 ? '#22c55e' : s >= 5 ? '#f59e0b' : '#ef4444';
-              return (
-                <div key={i} style={{ flex: 1, height: `${pct}%`, background: bc, borderRadius: '3px 3px 0 0', minHeight: '3px', border: isToday ? '1px solid #6ee7f7' : 'none' }} />
-              );
+              return <div key={i} style={{ flex: 1, height: `${pct}%`, background: bc, borderRadius: '3px 3px 0 0', minHeight: '3px', border: isToday ? '1px solid #6ee7f7' : 'none' }} />;
             })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'rgba(255,255,255,0.3)', marginTop: '3px' }}>
@@ -310,10 +324,10 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       <div className="stats-grid">
         {[
           { label: '카페인 섭취량', val: '280', unit: 'mg', pct: 85, color: '#ef4444', tag: '기준 초과' },
-          { label: '스크린 타임', val: '6.5', unit: 'h', pct: 72, color: '#f59e0b', tag: '주의 필요' },
-          { label: '근무시간', val: '9', unit: 'h', pct: 75, color: '#f59e0b', tag: '주의 필요' },
-          { label: '운동시간', val: '45', unit: '분', pct: 75, color: '#22c55e', tag: '양호' },
-          { label: '수면 시간', val: '5', unit: 'h', pct: 55, color: '#f59e0b', tag: '권장 7~8h' },
+          { label: '스크린 타임',   val: '6.5', unit: 'h',  pct: 72, color: '#f59e0b', tag: '주의 필요' },
+          { label: '근무시간',      val: '9',   unit: 'h',  pct: 75, color: '#f59e0b', tag: '주의 필요' },
+          { label: '운동시간',      val: '45',  unit: '분', pct: 75, color: '#22c55e', tag: '양호' },
+          { label: '수면 시간',     val: '5',   unit: 'h',  pct: 55, color: '#f59e0b', tag: '권장 7~8h' },
         ].map(item => (
           <div key={item.label} className="stat-card">
             <div className="stat-label">{item.label}</div>
@@ -328,38 +342,127 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       <div className="section-title">SLEEP CALENDAR</div>
       <div className="week-chart" style={{ padding: '14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <button className="cal-nav">◀</button>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '18px', letterSpacing: '1px' }}>2026.03</div>
-          <button className="cal-nav">▶</button>
+          <button className="cal-nav" onClick={goPrevMonth}>◀</button>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '18px', letterSpacing: '1px' }}>
+            {monthLabel}
+          </div>
+          <button className="cal-nav" onClick={goNextMonth}>▶</button>
         </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
           {calDays.map(d => (
             <div key={d} style={{ textAlign: 'center', fontSize: '9px', color: 'rgba(255,255,255,0.3)', padding: '2px 0' }}>{d}</div>
           ))}
         </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>
           {Array(firstDay).fill(null).map((_, i) => <div key={'blank'+i} />)}
-          {Array(31).fill(null).map((_, i) => {
+          {Array(daysInMonth).fill(null).map((_, i) => {
             const d = i + 1;
-            const type = calData[d];
+            const type  = calData[d];
             const score = calScores[d];
-            const isToday = d === 17;
-            const dotColor = type === 'good' ? 'rgba(34,197,94,0.3)' : type === 'warn' ? 'rgba(245,158,11,0.3)' : type === 'bad' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.05)';
-            const dotTextColor = type === 'good' ? '#22c55e' : type === 'warn' ? '#f59e0b' : type === 'bad' ? '#ef4444' : 'rgba(255,255,255,0.2)';
+            const isToday    = type === 'today';
+            const isSelected = selectedDate?.year === calYear &&
+                               selectedDate?.month === calMonth &&
+                               selectedDate?.day === d;
+
+            const dotColor = type === 'good' ? 'rgba(34,197,94,0.3)'
+              : type === 'warn' ? 'rgba(245,158,11,0.3)'
+              : type === 'bad'  ? 'rgba(239,68,68,0.3)'
+              : isToday         ? 'rgba(110,231,247,0.15)'
+              : 'rgba(255,255,255,0.05)';
+            const dotTextColor = type === 'good' ? '#22c55e'
+              : type === 'warn' ? '#f59e0b'
+              : type === 'bad'  ? '#ef4444'
+              : isToday         ? '#6ee7f7'
+              : 'rgba(255,255,255,0.2)';
+
             return (
-              <div key={d} style={{
-                borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', padding: '3px 0', cursor: 'pointer',
-                border: isToday ? '1px solid #6ee7f7' : '1px solid transparent',
-                background: score ? 'rgba(255,255,255,0.02)' : 'transparent'
-              }}>
-                <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>{d}</div>
-                <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: dotColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7px', color: dotTextColor, marginTop: '2px' }}>
+              <div
+                key={d}
+                onClick={() => setSelectedDate({ year: calYear, month: calMonth, day: d })}
+                style={{
+                  borderRadius: '6px',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  padding: '3px 0', cursor: 'pointer',
+                  border: isSelected
+                    ? '1px solid var(--accent)'
+                    : isToday
+                    ? '1px solid #6ee7f7'
+                    : '1px solid transparent',
+                  background: isSelected
+                    ? 'rgba(110,231,247,0.12)'
+                    : score || isToday
+                    ? 'rgba(255,255,255,0.02)'
+                    : 'transparent',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{
+                  fontSize: '8px',
+                  color: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.3)',
+                  lineHeight: 1,
+                }}>{d}</div>
+                <div style={{
+                  width: '18px', height: '18px', borderRadius: '50%',
+                  background: isSelected ? 'rgba(110,231,247,0.3)' : dotColor,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '7px',
+                  color: isSelected ? '#6ee7f7' : dotTextColor,
+                  marginTop: '2px',
+                  transition: 'all 0.15s ease',
+                }}>
                   {isToday ? '오' : score || '-'}
                 </div>
               </div>
             );
           })}
+        </div>
+
+        {/* 선택된 날짜 정보 */}
+        {selectedDate && (
+          <div style={{
+            marginTop: '12px', padding: '10px 14px',
+            background: 'rgba(110,231,247,0.06)',
+            border: '1px solid rgba(110,231,247,0.2)',
+            borderRadius: '10px',
+            display: 'flex', alignItems: 'center', gap: '10px',
+          }}>
+            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '20px', color: 'var(--accent)' }}>
+              {selectedDate.year}.{String(selectedDate.month + 1).padStart(2,'0')}.{String(selectedDate.day).padStart(2,'0')}
+            </div>
+            {calScores[selectedDate.day] && selectedDate.year === calYear && selectedDate.month === calMonth ? (
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                수면 점수 <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{calScores[selectedDate.day]}점</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                기록 없음
+              </div>
+            )}
+            <button
+              onClick={() => setSelectedDate(null)}
+              style={{
+                marginLeft: 'auto', background: 'none', border: 'none',
+                color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '14px',
+              }}
+            >✕</button>
+          </div>
+        )}
+
+        {/* 범례 */}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'center' }}>
+          {[
+            { color: 'rgba(34,197,94,0.3)',  text: '양호', textColor: '#22c55e' },
+            { color: 'rgba(245,158,11,0.3)', text: '주의', textColor: '#f59e0b' },
+            { color: 'rgba(239,68,68,0.3)',  text: '위험', textColor: '#ef4444' },
+          ].map(l => (
+            <div key={l.text} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: l.color }} />
+              <span style={{ fontSize: '9px', color: l.textColor }}>{l.text}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

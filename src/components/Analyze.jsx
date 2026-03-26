@@ -307,7 +307,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         {/* 점수 표시 (선택사항) */}
         {scanned && (
           <div style={{ color: 'var(--accent)', fontWeight: 'bold', marginTop: '10px' }}>
-            검출된 다크서클 지수: {darkScore}점
+            다크서클 점수: {darkScore}점
           </div>
         )}
       </div>
@@ -507,72 +507,13 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 {result && (
   <div ref={resultRef}>
 
-    {/* ✅ 추가: AI 수면 예측 결과 카드 */}
-    <div style={{
-      background: 'rgba(110,231,247,0.1)',
-      border: '1px solid rgba(110,231,247,0.4)',
-      borderRadius: '16px',
-      padding: '20px',
-      marginBottom: '14px',
-      textAlign: 'center'
-    }}>
-      <div style={{ 
-        fontSize: '12px', 
-        color: '#6ee7f7', 
-        marginBottom: '12px',
-        letterSpacing: '1px',
-        fontWeight: 500
-      }}>
-        🧠 AI 수면 예측 결과
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ 
-            fontSize: '42px', 
-            fontFamily: "'Bebas Neue', sans-serif", 
-            color: '#6ee7f7',
-            lineHeight: 1
-          }}>
-            {result.sleepScore}
-          </div>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-            예상 수면시간 (h)
-          </div>
-        </div>
-        <div>
-          <div style={{ 
-            fontSize: '42px', 
-            fontFamily: "'Bebas Neue', sans-serif", 
-            color: result.sleepScorePoint >= 70 ? '#22c55e' : result.sleepScorePoint >= 30 ? '#f59e0b' : '#ef4444',
-            lineHeight: 1
-          }}>
-            {result.sleepScorePoint}
-          </div>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-            수면점수 (0~100점)
-          </div>
-        </div>
-      </div>
-      <div style={{ 
-        fontSize: '10px', 
-        color: 'rgba(255,255,255,0.4)', 
-        marginTop: '12px',
-        borderTop: '1px solid rgba(110,231,247,0.2)',
-        paddingTop: '10px'
-      }}>
-        {result.sleepScorePoint >= 70 ? '✨ 양호한 수면 상태입니다!' : 
-         result.sleepScorePoint >= 30 ? '⚠️ 수면 개선이 필요합니다.' : 
-         '🔥 심각한 수면 부족 상태입니다! 당장 휴식이 필요해요!'}
-      </div>
-    </div>
-
     {/* 피로도 분석 결과 카드 */}
     <div style={{
       background: 'linear-gradient(135deg, #1e1040, #2a1a5e)',
       border: '1px solid rgba(167,139,250,0.25)',
       borderRadius: '16px', padding: '20px', marginBottom: '14px',
     }}>
-      <div style={{ textAlign: 'center', fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: '16px', letterSpacing: '1px' }}>
+      <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: '16px', letterSpacing: '1px' }}>
         피로도 분석 결과
       </div>
 

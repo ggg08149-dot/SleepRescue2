@@ -71,11 +71,13 @@ const PLAN_MISSIONS = {
 };
 
 const WHITE_NOISE = [
-  { title: '빗소리',          artist: '자연 백색소음',  dur: '60:00', icon: '🌧' },
-  { title: '파도 소리',       artist: '해변 백색소음',  dur: '45:00', icon: '🌊' },
-  { title: '숲속 바람',       artist: '자연 백색소음',  dur: '30:00', icon: '🌿' },
-  { title: 'Deep Sleep Waves', artist: 'Binaural Beats', dur: '60:00', icon: '🎵' },
+
+  { title: '빗소리',           artist: '자연 백색소음',  dur: '∞', icon: '🌧', url: '/sounds/rain.mp3' },
+  { title: '파도 소리',        artist: '해변 백색소음',  dur: '∞', icon: '🌊', url: '/sounds/wave.mp3' },
+  { title: '숲속 바람',        artist: '자연 백색소음',  dur: '∞', icon: '🌿', url: '/sounds/forest.mp3' },
+  { title: 'Deep Sleep Waves', artist: 'Binaural Beats', dur: '∞', icon: '🎵', url: '/sounds/sleep.mp3' },
 ];
+
 
 const TYPE_COLOR = {
   '필수': { bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.4)',   color: '#f87171' },
@@ -94,6 +96,22 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [activeDay, setActiveDay]   = useState(1);
   const [checks, setChecks]         = useState({});
   const [playingIdx, setPlayingIdx] = useState(null);
+  const audioRef = React.useRef(null);
+
+  const handlePlay = (idx) => {
+    if (playingIdx === idx) {
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+      setPlayingIdx(null);
+    } else {
+      if (audioRef.current) { audioRef.current.pause(); }
+      const audio = new Audio(WHITE_NOISE[idx].url);
+      audio.loop = true;
+      audio.volume = 0.5;
+      audio.play().catch(() => alert('오디오 재생에 실패했습니다.'));
+      audioRef.current = audio;
+      setPlayingIdx(idx);
+    }
+  };
 
   const planDays = PLAN_MISSIONS[activePlan] || PLAN_MISSIONS[7];
 
@@ -371,7 +389,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
             </div>
             <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{m.dur}</div>
             <div className="play-btn"
-              onClick={() => setPlayingIdx(playingIdx === idx ? null : idx)}
+              onClick={() => handlePlay(idx)}
               style={{
                 background: playingIdx === idx ? 'rgba(110,231,247,0.2)' : 'rgba(110,231,247,0.1)',
                 border: playingIdx === idx ? '1px solid rgba(110,231,247,0.4)' : 'none',

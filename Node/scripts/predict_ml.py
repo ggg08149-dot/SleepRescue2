@@ -164,6 +164,9 @@ relaxation = max(0, relaxation)
 # 10. 예측 수면시간 구하기
 # 입력: 운동, 폰, 근무, 카페인, 휴식시간(계산값)
 # =====================================================
+# 🔍 디버깅용 출력 (서버 로그에서 확인)
+print(f"🔍 디버그 - 운동:{workout}, 폰:{phone}, 근무:{work_hours}, 카페인:{caffeine}mg, 수면:{user_sleep}, 휴식:{relaxation}", file=sys.stderr)
+
 input_data = pd.DataFrame([{
     'WorkoutTime': workout,
     'PhoneTime': phone,
