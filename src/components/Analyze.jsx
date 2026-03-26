@@ -26,9 +26,11 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const [drinks, setDrinks] = useState([]);
   const [result, setResult] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
+
   // 분석결과를 화면에 보여주기 위한 상태들
   const [darkScore, setDarkScore] = useState(0); 
   const [statusMsg, setStatusMsg] = useState("준비 완료");
+  const [analyzedImg, setAnalyzedImg] = useState(null); // 분석된 이미지(Base64) 저장
   // -------------------------------------------------
   const [lifestyleData, setLifestyleData] = useState({
     workout: '',      // 운동시간 (h)
@@ -37,7 +39,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     sleepTime: ''     // 수면시간 (h)
     });
   // ---------------------------------------------------
-  const shadowRef = useRef(null);
   const resultRef = useRef(null);
   const webcamRef = useRef(null); // 웹캠 참조를 위한 ref
 
@@ -130,24 +131,19 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     return drinks.includes('🚫 없음');
   };
 
-
+// ---------------[YOLO 분석 함수]-----------------------
   const doScan = async () => {
+    if (scanning) return;
+
     setScanning(true);
     setStatusMsg("분석 중..."); // 상태 업데이트
+
     try {
-          if (!webcamRef.current) {
-            alert("카메라 객체를 찾을 수 없습니다. (Ref 연결 확인 필요)");
-            setScanning(false);
-            return;
-          }
+          if (!webcamRef.current) throw new Error("카메라를 찾을 수 없습니다.");
 
           // 1. 웹캠에서 사진 캡처
           const imageSrc = webcamRef.current.getScreenshot(); 
-          if (!imageSrc) {
-            alert("카메라 화면을 가져올 수 없습니다. 카메라 권한을 허용해주세요.");
-            setScanning(false);
-            return;
-          }
+          if (!imageSrc) throw new Error("캡처에 실패했습니다.");
 
           // 2. 서버 전송을 위해 Blob으로 변환
           const imageRes = await fetch(imageSrc);
@@ -159,18 +155,24 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           const response = await axios.post('http://127.0.0.1:8000/predict/yolo', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
-
-          // 4. 서버에서 받은 점수 적용
-          const score = response.data.dark_circle_score;
-          setScanning(false);
+          
+        if (response.data.status === "success") {
+          // ✅ 선언한 상태 변수 이름에 맞춰서 저장
+          setDarkScore(response.data.dark_circle_score);
+          setAnalyzedImg(response.data.result_image); // "data:image/jpeg;base64,..." 형태
           setScanned(true);
-          setDarkScore(score);      // 점수 저장
-          setStatusMsg("분석 완료"); // 메시지 저장
+          setStatusMsg("분석 완료");
+          console.log("분석 성공:", response.data.dark_circle_score);
+        } else {
+          alert("다크서클 검출에 실패했습니다. 조명을 밝게 하고 다시 시도해주세요.");
+        }
 
         } catch (error) {
           console.error("분석 실패:", error);
           setScanning(false);
           alert("서버 연결에 실패했습니다. FastAPI 서버(8000포트)가 실행 중인지 확인해주세요!");
+        } finally {
+          setScanning(false); // 성공하든 실패하든 로딩 해제
         }
       };
 
@@ -257,38 +259,58 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
       {/* 웹캠 영역 */}
       <div className="cam-box-big">
-        <div className="cam-preview" style={{ position: 'relative', overflow: 'hidden' }}>
-          <div className="cam-scan-anim"></div>
+        <div className="cam-preview"style={{ position: 'relative', overflow: 'hidden', background: '#000', borderRadius: '12px' }}>
 
-          {/* 실제 카메라 화면을 띄워주는 컴포넌트 배치 */}
-        {!scanned && !scanning && (
-                    <Webcam
-                      audio={false}
-                      ref={webcamRef} // 👈 이게 있어야 doScan에서 인식합니다!
-                      screenshotFormat="image/jpeg"
-                      videoConstraints={{ facingMode: "user" }}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  )}
+          {/* 상황1. 촬영 전 (실시간 웹캠) */}
+          {!scanned && !scanning && (
+              <Webcam
+                audio={false}
+                ref={webcamRef} // 👈 이게 있어야 doScan에서 인식합니다!
+                screenshotFormat="image/jpeg"
+                videoConstraints={{ facingMode: "user" }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            )}
 
-                  {scanning && (
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', zIndex: 10 }}>
-                      <div style={{ fontSize: '40px' }}>👁</div>
-                      <div style={{ fontSize: '10px', color: '#6ee7f7', marginTop: '6px' }}>다크서클 분석중...</div>
-                    </div>
-                  )}
+          {/* 상황2: 분석 중(로딩 화면) */}
+          {scanning && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', zIndex: 10 }}>
+              <div style={{ fontSize: '40px' }}>👁</div>
+              <div style={{ fontSize: '14px', color: '#6ee7f7', marginTop: '10px' }}>AI가 다크서클을 분석하고 있습니다...</div>
+            </div>
+          )}
                   
-                  {/* ... 스캔 완료 시 보여줄 결과(SVG 눈 모양 등)는 기존 코드 유지 ... */}
-                </div>
-                
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button className="scan-btn" onClick={doScan}>📷 촬영 시작</button>
-                  <button onClick={() => {
-                    setScanned(false);
-                    setResult(null); // 이전 결과 초기화
-                    }} className="retry-btn">↺ 재촬영</button>
-                </div>
-              </div>
+          {/* 상황 3: 분석 완료 (박스 그려진 결과 이미지 출력) */}
+          {scanned && analyzedImg && (
+            <img 
+              src={analyzedImg} 
+              alt="분석 결과" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
+          )}
+        </div>
+        
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          {!scanned ? (
+            <button className="scan-btn" onClick={doScan} disabled={scanning}>
+              {scanning ? "분석 중..." : "📷 촬영 및 분석"}
+            </button>
+          ) : (
+            <button onClick={() => {
+                setScanned(false);
+                setAnalyzedImg(null);
+                setResult(null);
+              }} className="retry-btn">↺ 다시 촬영하기</button>
+          )}
+        </div>
+        
+        {/* 점수 표시 (선택사항) */}
+        {scanned && (
+          <div style={{ color: 'var(--accent)', fontWeight: 'bold', marginTop: '10px' }}>
+            검출된 다크서클 지수: {darkScore}점
+          </div>
+        )}
+      </div>
         
       {/* 생활 패턴 입력 */}
       <div className="section-title">생활 패턴 입력</div>
