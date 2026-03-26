@@ -305,11 +305,11 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         </div>
         
         {/* 점수 표시 (선택사항) */}
-        {scanned && (
+        {/* {scanned && (
           <div style={{ color: 'var(--accent)', fontWeight: 'bold', marginTop: '10px' }}>
             검출된 다크서클 지수: {darkScore}점
           </div>
-        )}
+        )} */}
       </div>
         
       {/* 생활 패턴 입력 */}
