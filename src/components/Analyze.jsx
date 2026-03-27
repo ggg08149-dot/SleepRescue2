@@ -31,6 +31,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const [darkScore, setDarkScore] = useState(0); 
   const [statusMsg, setStatusMsg] = useState("준비 완료");
   const [analyzedImg, setAnalyzedImg] = useState(null); // 분석된 이미지(Base64) 저장
+  const [capturedBlob, setCapturedBlob] = useState(null); // 파일 저장용 Blob
   // -------------------------------------------------
   const [lifestyleData, setLifestyleData] = useState({
     workout: '',      // 운동시간 (h)
@@ -147,7 +148,8 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
           // 2. 서버 전송을 위해 Blob으로 변환
           const imageRes = await fetch(imageSrc);
-          const imageBlob = await imageRes.blob(); 
+          const imageBlob = await imageRes.blob();
+          setCapturedBlob(imageBlob); // doAnalyze()에서 파일 크기 사용
           const formData = new FormData();
           formData.append('file', imageBlob, 'capture.jpg'); 
 
@@ -177,7 +179,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       };
 
 
-// --------------------[피로지수, 피로도 계산]----------------------------------------------------------------
+// --------------------[피로지수, 피로도 계산 + DB 저장]---------------------------------------------------
   const doAnalyze = async () => {
     // 입력값 검증
     if (!lifestyleData.workout || !lifestyleData.phone ||
@@ -185,66 +187,120 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       alert('운동시간, 폰 사용시간, 근무시간, 수면시간을 모두 입력해주세요!');
       return;
     }
+    if (!scanned) {
+      alert('먼저 웹캠 촬영 및 분석을 진행해주세요!');
+      return;
+    }
 
-    // 운동시간
+    const user_idx = sessionStorage.getItem('user_idx');
+    if (!user_idx) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
     const workoutHours = parseFloat(lifestyleData.workout);
-    // 수면시간
-    const sleepHours = parseFloat(lifestyleData.sleepTime);
-    // 카페인 총 mg 계산
-    const caffeineMg = getTotalCaffeineMg();
+    const sleepHours   = parseFloat(lifestyleData.sleepTime);
+    const caffeineMg   = getTotalCaffeineMg();
+    const BASE = 'http://localhost:7000';
 
     try {
-      // 백엔드 API 호출 (포트 7000으로 수정!)
-      const response = await fetch('http://localhost:7000/api/predict', {
+      // ── STEP 1: 생활패턴 저장 ────────────────────
+      const lifelogRes = await fetch(`${BASE}/api/lifelog/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workout: workoutHours,
-          phone: parseFloat(lifestyleData.phone),
+          user_idx,
+          exec_hours:  workoutHours,
+          phone_hours: parseFloat(lifestyleData.phone),
+          work_hours:  parseFloat(lifestyleData.workHours),
+          caffeine:    caffeineMg,
+          sleep_hours: sleepHours
+        })
+      });
+      const lifelogData = await lifelogRes.json();
+      if (!lifelogData.success) {
+        alert(`생활패턴 저장 실패: ${lifelogData.message}`);
+        return;
+      }
+      const lifelog_idx = lifelogData.lifelog_idx;
+
+      // ── STEP 2: 파일 메타데이터 저장 ─────────────
+      const fileRes = await fetch(`${BASE}/api/file/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_idx,
+          file_name: `capture_${Date.now()}.jpg`,
+          file_size: capturedBlob ? capturedBlob.size : 0,
+          file_ext:  'jpg'
+        })
+      });
+      const fileData = await fileRes.json();
+      if (!fileData.success) {
+        alert(`파일 저장 실패: ${fileData.message}`);
+        return;
+      }
+      const file_idx = fileData.file_idx;
+
+      // ── STEP 3: 다크서클 점수 저장 ───────────────
+      const dcRes = await fetch(`${BASE}/api/darkcircle/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_idx, user_idx, dc_score: darkScore })
+      });
+      const dcData = await dcRes.json();
+      if (!dcData.success) {
+        alert(`다크서클 저장 실패: ${dcData.message}`);
+        return;
+      }
+
+      // ── STEP 4: ML 실행 + 피로도 저장 ────────────
+      const fatigueRes = await fetch(`${BASE}/api/fatigue/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_idx,
+          lifelog_idx,
+          workout:   workoutHours,
+          phone:     parseFloat(lifestyleData.phone),
           workHours: parseFloat(lifestyleData.workHours),
-          caffeine: caffeineMg,  // mg 단위로 전송!
+          caffeine:  caffeineMg,
           sleepTime: sleepHours
         })
       });
-      
-      const data = await response.json();
-      
-      // 피로도 공식 : 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore
-      // 현재 darkScore와 sleepScore는 값이 클수록 좋은 상태임
-      // 피로지수는 낮을수록 좋은상태로 만들고 싶어서 이렇게 정의함
-      const currentDarkScore = darkScore;
-      const sleepScore = data.sleep_score;
-      const fatigueScore = 100 - (currentDarkScore * 0.3) - (sleepScore * 0.7);
-
-      // 피로지수 70이상: 피로도 높음, 30~70점: 주의, 330점 이하: 낮음
-      let fatigue = 'low';
-      if (fatigueScore >= 70) {
-        fatigue = 'high';
-      } else if (fatigueScore > 30) {
-        fatigue = 'mid';
-      } else {
-        fatigue = 'low';
+      const fatigueData = await fatigueRes.json();
+      if (!fatigueData.success) {
+        alert(`ML 분석 실패: ${fatigueData.message}`);
+        return;
       }
-      
+
+      // ── 피로도 공식 : 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore ──
+      const sleepScore   = fatigueData.sleep_score;
+      const fatigueScore = 100 - (darkScore * 0.3) - (sleepScore * 0.7);
+
+      let fatigue = 'low';
+      if (fatigueScore >= 70) fatigue = 'high';
+      else if (fatigueScore > 30) fatigue = 'mid';
+
       const res = {
-        darkCircle: currentDarkScore,
-        sleepScore: data.predicted_hours,
-        sleepScorePoint: data.sleep_score,
-        avg3: 70,
-        fatigue: fatigue,
-        fatigueCause: data.fatigue_cause || '분석 중 오류가 발생했습니다.',  // ← 피로 원인 추가
-      fatigueDetails: data.fatigue_details || []  // ← 상세 원인 추가
+        darkCircle:      darkScore,
+        sleepScore:      fatigueData.predicted_hours,
+        sleepScorePoint: sleepScore,
+        avg3:            70,
+        fatigue,
+        fatigueCause:    fatigueData.fatigue_cause   || '분석 중 오류가 발생했습니다.',
+        fatigueDetails:  fatigueData.fatigue_details || []
       };
-      
+
       setResult(res);
       updateResult(res);
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-      
+
     } catch (error) {
-      console.error('예측 오류:', error);
-      alert('분석 중 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.');
+      console.error('분석 오류:', error);
+      alert(`분석 중 오류가 발생했습니다: ${error.message}`);
     }
   };
 
@@ -362,6 +418,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
             <button onClick={() => {
                 setScanned(false);
                 setAnalyzedImg(null);
+                setCapturedBlob(null);
                 setResult(null);
               }} className="retry-btn">↺ 다시 촬영하기</button>
           )}
