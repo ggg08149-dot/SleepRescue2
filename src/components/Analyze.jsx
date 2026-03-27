@@ -42,7 +42,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const resultRef = useRef(null);
   const webcamRef = useRef(null); // 웹캠 참조를 위한 ref
 
-  // 카페인 mg 계산 함수
+  //----------------------- [카페인 mg 계산 함수]------------------------------------------------------------
   const getTotalCaffeineMg = () => {
     if (drinks.includes('🚫 없음')) return 0;
     
@@ -131,7 +131,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     return drinks.includes('🚫 없음');
   };
 
-// ---------------[YOLO 분석 함수]-----------------------
+// ----------------------[YOLO 분석 함수]----------------------------------------------------------------------
   const doScan = async () => {
     if (scanning) return;
 
@@ -176,6 +176,8 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         }
       };
 
+
+// --------------------[피로지수, 피로도 계산]----------------------------------------------------------------
   const doAnalyze = async () => {
     // 입력값 검증
     if (!lifestyleData.workout || !lifestyleData.phone ||
@@ -207,13 +209,25 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       
       const data = await response.json();
       
-      // 예측 결과로 피로도 계산
+      // 피로도 공식 : 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore
+      // 현재 darkScore와 sleepScore는 값이 클수록 좋은 상태임
+      // 피로지수는 낮을수록 좋은상태로 만들고 싶어서 이렇게 정의함
+      const currentDarkScore = darkScore;
+      const sleepScore = data.sleep_score;
+      const fatigueScore = 100 - (currentDarkScore * 0.3) - (sleepScore * 0.7);
+
+      // 피로지수 70이상: 피로도 높음, 30~70점: 주의, 330점 이하: 낮음
       let fatigue = 'low';
-      if (data.sleep_score < 30) fatigue = 'high';
-      else if (data.sleep_score < 70) fatigue = 'mid';
+      if (fatigueScore >= 70) {
+        fatigue = 'high';
+      } else if (fatigueScore > 30) {
+        fatigue = 'mid';
+      } else {
+        fatigue = 'low';
+      }
       
       const res = {
-        darkCircle: 72,
+        darkCircle: currentDarkScore,
         sleepScore: data.predicted_hours,
         sleepScorePoint: data.sleep_score,
         avg3: 70,
