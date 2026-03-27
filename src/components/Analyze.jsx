@@ -641,7 +641,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       border: '1px solid rgba(167,139,250,0.25)',
       borderRadius: '16px', padding: '20px', marginBottom: '14px',
     }}>
-      <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', marginBottom: '16px', letterSpacing: '1px' }}>
+      <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 500, color: 'rgba(255,255,255)', marginBottom: '16px', letterSpacing: '1px' }}>
         피로도 분석 결과
       </div>
 
@@ -675,18 +675,18 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       {/* 피로 원인 표시 (추가) */}
       {result.fatigueCause && (
         <div style={{
-          background: 'rgba(110,231,247,0.15)',
+          background: 'rgba(110,231,247,0.13)',
           border: '1px solid rgba(110,231,247,0.3)',
           borderRadius: '12px',
           padding: '12px',
           marginBottom: '12px'
         }}>
-          <div style={{ fontSize: '12px', color: '#6ee7f7', marginBottom: '6px', fontWeight: 500 }}>
-            🔍 피로 원인 분석
-          </div>
-          <div style={{ fontSize: '13px', color: '#fff', fontWeight: 500 }}>
+          <div style={{ fontSize: '15px', color: '#ffffff', marginBottom: '6px', fontWeight: 500 }}>
+            🔍 피로 원인 분석          <span style={{ fontSize: '13px', color: '#6ee7f7', fontWeight: 500 }}>
             {result.fatigueCause}
+          </span>
           </div>
+
           {result.fatigueDetails && result.fatigueDetails.length > 0 && (
             <div style={{ marginTop: '8px' }}>
               {result.fatigueDetails.map((detail, idx) => (
@@ -702,22 +702,25 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       {/* 피로도 레벨 뱃지 + 메시지 */}
       {(() => {
         const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue);
-        const causeName = result.fatigueCause || '다크서클 지수 상승';
+        const causeName =
+          result.fatigueCause === "모든 항목이 양호한 상태입니다."
+            ? "누적된 피로"
+            : result.fatigueCause || "복합적 요인";
         const msg = getFatigueMessage(result.fatigue, userName, causeName);
         return (
           <div style={{
-            background: 'rgba(255,255,255,0.04)',
+            background: 'rgba(255,255,255,0.12)',
             border: `1px solid ${lv.border}`,
             borderRadius: '12px', padding: '14px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span style={{
+
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
+                🛌 {userName}님의 오늘의 피로도 <span style={{
                 background: lv.bg, border: `1px solid ${lv.border}`,
                 color: lv.color, fontSize: '11px', fontWeight: 700,
                 padding: '3px 10px', borderRadius: '20px',
               }}>{lv.label}</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
-                {userName}님의 피로 {lv.label}
               </span>
             </div>
             <div style={{
