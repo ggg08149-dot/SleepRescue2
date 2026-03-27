@@ -34,7 +34,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   // -------------------------------------------------
   const [lifestyleData, setLifestyleData] = useState({
     workout: '',      // 운동시간 (h)
-    phone: '',        // 폰 사용 시간 (h)
+    phone: '',        // 휴대폰 사용 시간 (h)
     workHours: '',    // 근무시간 (h)
     sleepTime: ''     // 수면시간 (h)
     });
@@ -404,7 +404,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           </div>
           <div className="input-row" style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
             <div className="input-group">
-              <div className="input-label">폰 사용 (h)</div>
+              <div className="input-label">휴대폰 사용시간 (h)</div>
               <input 
                 className="input-field" 
                 type="number" 
