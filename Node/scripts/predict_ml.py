@@ -14,8 +14,8 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # 1. 상수 정의
 # =====================================================
 SLEEP_TARGET_HOURS = 7.5
-SIGMA_UNDER = 1.8
-SIGMA_OVER = 4.2
+SIGMA_UNDER = 3.8
+SIGMA_OVER = 5.0
 
 CAFFEINE_MAP = {
     '아메리카노': 120,
