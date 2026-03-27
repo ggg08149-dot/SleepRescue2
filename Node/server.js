@@ -112,6 +112,7 @@ app.post('/api/login', async (req, res) => {
     res.json({
       success  : true,
       token    : token,
+      user_idx : user.user_idx,
       userId   : user.account_id,
       userName : user.name,
       userEmail: user.email,
@@ -218,6 +219,125 @@ app.put('/api/user/password', async (req, res) => {
     db.query('UPDATE tb_user SET password = ? WHERE user_idx = ?', [hashedPw, decoded.id], (err) => {
       if (err) return res.json({ success: false, message: '비밀번호 변경에 실패했습니다.' });
       res.json({ success: true, message: '비밀번호가 변경되었습니다.' });
+    });
+  });
+});
+
+// ─── STEP 1: 생활패턴 저장 API ───────────────
+// POST /api/lifelog/save → tb_lifelog INSERT, lifelog_idx 반환
+app.post('/api/lifelog/save', (req, res) => {
+  const { user_idx, exec_hours, phone_hours, work_hours, caffeine, sleep_hours } = req.body;
+  if (!user_idx) return res.json({ success: false, message: 'user_idx가 필요합니다.' });
+
+  const sql = `INSERT INTO tb_lifelog (user_idx, exec_hours, phone_hours, work_hours, caffeine, sleep_hours)
+               VALUES (?, ?, ?, ?, ?, ?)`;
+  db.query(sql, [user_idx, exec_hours || 0, phone_hours || 0, work_hours || 0, caffeine || 0, sleep_hours || 0], (err, result) => {
+    if (err) {
+      console.error('❌ lifelog 저장 오류:', err);
+      return res.json({ success: false, message: 'lifelog 저장에 실패했습니다.' });
+    }
+    res.json({ success: true, lifelog_idx: result.insertId });
+  });
+});
+
+// ─── STEP 2: 파일 메타데이터 저장 API ─────────
+// POST /api/file/save → tb_file INSERT, file_idx 반환
+app.post('/api/file/save', (req, res) => {
+  const { user_idx, file_name, file_size, file_ext } = req.body;
+  if (!user_idx) return res.json({ success: false, message: 'user_idx가 필요합니다.' });
+
+  const sql = `INSERT INTO tb_file (user_idx, file_name, file_size, file_ext)
+               VALUES (?, ?, ?, ?)`;
+  db.query(sql, [user_idx, file_name || 'capture.jpg', file_size || 0, file_ext || 'jpg'], (err, result) => {
+    if (err) {
+      console.error('❌ file 저장 오류:', err);
+      return res.json({ success: false, message: 'file 저장에 실패했습니다.' });
+    }
+    res.json({ success: true, file_idx: result.insertId });
+  });
+});
+
+// ─── STEP 3: 다크서클 점수 저장 API ──────────
+// POST /api/darkcircle/save → tb_darkcircle INSERT, dc_score 반환
+app.post('/api/darkcircle/save', (req, res) => {
+  const { file_idx, user_idx, dc_score } = req.body;
+  if (!file_idx || !user_idx) return res.json({ success: false, message: 'file_idx, user_idx가 필요합니다.' });
+
+  const sql = `INSERT INTO tb_darkcircle (file_idx, user_idx, dc_score) VALUES (?, ?, ?)`;
+  db.query(sql, [file_idx, user_idx, dc_score || 0], (err, result) => {
+    if (err) {
+      console.error('❌ darkcircle 저장 오류:', err);
+      return res.json({ success: false, message: '다크서클 점수 저장에 실패했습니다.' });
+    }
+    res.json({ success: true, dc_idx: result.insertId, dc_score });
+  });
+});
+
+// ─── STEP 4: ML 실행 + 피로도 저장 API ────────
+// POST /api/fatigue/save → ML 실행 + tb_fatigue INSERT + tb_lifelog sleep_score UPDATE
+app.post('/api/fatigue/save', (req, res) => {
+  const { file_idx, lifelog_idx, workout, phone, workHours, caffeine, sleepTime } = req.body;
+  if (!file_idx || !lifelog_idx) return res.json({ success: false, message: 'file_idx, lifelog_idx가 필요합니다.' });
+
+  const pythonScript = path.join(__dirname, 'scripts', 'predict_ml.py');
+  const args = [
+    String(parseFloat(workout)   || 0),
+    String(parseFloat(phone)     || 0),
+    String(parseFloat(workHours) || 0),
+    String(parseFloat(caffeine)  || 0),
+    String(parseFloat(sleepTime) || 0)
+  ];
+
+  console.log(`🐍 ML 실행: python "${pythonScript}" ${args.join(' ')}`);
+
+  exec(`python "${pythonScript}" ${args.join(' ')}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error('❌ ML 실행 오류:', error);
+      return res.status(500).json({ success: false, message: 'ML 분석 중 오류가 발생했습니다.' });
+    }
+
+    let mlResult;
+    try {
+      mlResult = JSON.parse(stdout.trim());
+    } catch (e) {
+      console.error('❌ ML JSON 파싱 오류:', e, '\nstdout:', stdout);
+      return res.status(500).json({ success: false, message: 'ML 결과 처리 오류' });
+    }
+
+    const { sleep_score, predicted_hours, fatigue_cause, fatigue_details } = mlResult;
+
+    // 피로도 레벨 결정
+    let fatigue_level = 'low';
+    if (sleep_score < 30) fatigue_level = 'high';
+    else if (sleep_score < 70) fatigue_level = 'mid';
+
+    const analysis_result = JSON.stringify(fatigue_details || []);
+
+    // tb_fatigue INSERT
+    const insertSql = `INSERT INTO tb_fatigue (file_idx, lifelog_idx, fatigue_score, fatigue_reason, fatigue_level, analysis_result)
+                       VALUES (?, ?, ?, ?, ?, ?)`;
+    db.query(insertSql, [file_idx, lifelog_idx, sleep_score, fatigue_cause, fatigue_level, analysis_result], (err) => {
+      if (err) {
+        console.error('❌ fatigue 저장 오류:', err);
+        return res.status(500).json({ success: false, message: 'fatigue 저장에 실패했습니다.' });
+      }
+
+      // tb_lifelog sleep_score UPDATE
+      db.query('UPDATE tb_lifelog SET sleep_score = ? WHERE lifelog_idx = ?', [sleep_score, lifelog_idx], (err2) => {
+        if (err2) {
+          console.error('❌ lifelog 업데이트 오류:', err2);
+          return res.status(500).json({ success: false, message: 'lifelog 업데이트에 실패했습니다.' });
+        }
+
+        res.json({
+          success: true,
+          sleep_score,
+          predicted_hours,
+          fatigue_level,
+          fatigue_cause,
+          fatigue_details: fatigue_details || []
+        });
+      });
     });
   });
 });
