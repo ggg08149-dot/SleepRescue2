@@ -124,12 +124,12 @@ def analyze_fatigue_cause_with_weight(workout, phone, work_hours, caffeine):
 
     # 순위 매기기
     if len(problem_items) == 0:
-        return "✅ 모든 항목이 양호한 상태입니다. 현재 생활 패턴을 유지하세요."
+        return "모든 항목이 양호한 상태입니다."
     else:
         rank_str = []
         for i, (name, val, desc, weight) in enumerate(problem_items, 1):
-            rank_str.append(f"{i}순위: {name} - {desc}")
-        return "🔍 피로 원인 순위: " + " | ".join(rank_str)
+            rank_str.append(f"{name}")
+        return  " 및 ".join(rank_str)
 
 
 # =====================================================
@@ -140,45 +140,45 @@ def analyze_fatigue_cause_detail(workout, phone, work_hours, caffeine):
     
     # 1. 휴대폰 사용 시간
     if phone > 5:
-        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 - 하루 5시간 이상 사용하면 수면 질이 저하되고, 블루라이트가 멜라토닌 분비를 방해할 수 있어요")
+        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 | 하루 5시간 이상 사용하면 수면 질이 저하되고, 블루라이트가 멜라토닌 분비를 방해할 수 있어요.")
     elif phone > 3:
-        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 - 적정 수준이지만, 취침 1시간 전에는 사용을 피하는 게 좋아요")
+        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 | 적정 수준이지만, 취침 1시간 전에는 사용을 피하는 게 좋아요.")
     else:
-        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 - 양호한 수준이에요, 현재 패턴을 유지해주세요")
+        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 | 양호한 수준이에요, 현재 패턴을 유지해주세요.")
     
     # 2. 근무 시간
     if work_hours > 9:
-        causes.append(f"💼 근무 {work_hours:.1f}시간 - 과로 상태예요, 업무 스트레스가 수면의 질을 크게 저하시킬 수 있어요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 | 과로 상태예요, 업무 스트레스가 수면의 질을 크게 저하시킬 수 있어요.")
     elif work_hours > 8:
-        causes.append(f"💼 근무 {work_hours:.1f}시간 - 장시간 근무로 피로가 누적되고 있어요, 퇴근 후 충분히 쉬어주세요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 | 장시간 근무로 피로가 누적되고 있어요, 퇴근 후 충분히 쉬어주세요.")
     elif work_hours <= 2:
-        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 매우 짧아 충분히 여유로워요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 | 근무 시간이 매우 짧아 충분히 여유로워요.")
     elif work_hours <= 4:
-        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 짧아 여유로운 생활이 가능해요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 | 근무 시간이 짧아 여유로운 생활이 가능해요.")
     elif work_hours <= 6:
-        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 적당해요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 | 근무 시간이 적당해요.")
     else:
-        causes.append(f"💼 근무 {work_hours:.1f}시간 - 적정 근무 시간이에요, 현재 패턴을 유지해주세요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 | 적정 근무 시간이에요, 현재 패턴을 유지해주세요.")
     
     # 3. 운동
     if workout > 3:
-        causes.append(f"🏃 운동 시간 {workout:.1f}시간 - 운동량이 너무 많아요. 과도한 운동은 오히려 피로를 쌓을 수 있으니 적당히 조절해주세요")
+        causes.append(f"🏃 운동 시간 {workout:.1f}시간 | 운동량이 너무 많아요. 과도한 운동은 오히려 피로를 쌓을 수 있으니 적당히 조절해주세요.")
     elif workout < 0.5:
-        causes.append(f"🏃 운동 부족 (하루 {workout:.1f}시간) - 규칙적인 운동은 수면의 질을 30% 이상 향상시킬 수 있어요")
+        causes.append(f"🏃 운동 부족 (하루 {workout:.1f}시간) | 규칙적인 운동은 수면의 질을 30% 이상 향상시킬 수 있어요.")
     elif workout > 1.5:
-        causes.append(f"🏃 적절한 운동 (하루 {workout:.1f}시간) - 좋은 수면 습관을 유지하고 계세요")
+        causes.append(f"🏃 적절한 운동 (하루 {workout:.1f}시간) | 좋은 수면 습관을 유지하고 계세요.")
     else:
-        causes.append(f"🏃 운동 {workout:.1f}시간 - 적정 수준이에요, 꾸준히 유지해주세요")
+        causes.append(f"🏃 운동 {workout:.1f}시간 | 적정 수준이에요, 꾸준히 유지해주세요.")
     
     # 4. 카페인 (기준 150mg)
     if caffeine > 200:
-        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 과다 섭취하고 있어요, 오후 3시 이후에는 카페인 섭취를 피하는 게 좋아요")
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg | 과다 섭취하고 있어요, 오후 3시 이후에는 카페인 섭취를 피하는 게 좋아요.")
     elif caffeine > 150:
-        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 적정 범위를 초과했어요, 취침 6시간 전까지는 카페인 섭취를 줄이는 게 좋아요")
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg | 적정 범위를 초과했어요, 취침 6시간 전까지는 카페인 섭취를 줄이는 게 좋아요.")
     elif caffeine > 0:
-        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 적정 수준이에요, 현재 패턴을 유지해주세요")
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg | 적정 수준이에요, 현재 패턴을 유지해주세요.")
     else:
-        causes.append(f"☕ 카페인 없음 - 양호해요")
+        causes.append(f"☕ 카페인 없음 | 양호해요.")
     
     return causes
 
@@ -320,7 +320,7 @@ if mode == "json":
         "status": "success",
         "user_sleep": user_sleep,
         "predicted_hours": predicted_hours,
-        "relaxation": round(relaxation, 2),
+        # "relaxation": round(relaxation, 2),
         "caffeine_mg": caffeine,
         "sleep_score": sleep_score,
         "fatigue_cause": fatigue_rank,
