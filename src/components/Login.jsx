@@ -32,6 +32,7 @@ function Login({ goHome, goSignUp }) {
 
       if (data.success) {
         localStorage.setItem('token', data.token);
+        sessionStorage.setItem('user_idx', data.user_idx);
         goHome(data.userName, data.userEmail, data.userId);
       } else {
         setError(data.message);
