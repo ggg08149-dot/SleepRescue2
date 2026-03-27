@@ -73,51 +73,51 @@ def analyze_fatigue_cause_with_weight(workout, phone, work_hours, caffeine):
     # 근무시간에 따른 가중치 조정
     if work_hours <= 2:
         work_factor = 0.2
-        work_note = " (근무시간이 매우 짧아 여유로움)"
+        work_note = " (근무시간이 매우 짧아 여유로워요)"
     elif work_hours <= 4:
         work_factor = 0.5
-        work_note = " (근무시간이 짧아 여유로움)"
+        work_note = " (근무시간이 짧아 여유로워요)"
     elif work_hours <= 6:
         work_factor = 0.8
-        work_note = " (근무시간이 적당함)"
+        work_note = " (근무시간이 적당해요)"
     elif work_hours <= 8:
         work_factor = 1.0
         work_note = ""
     else:
         work_factor = 1.2
-        work_note = " (과로 상태)"
+        work_note = " (과로 상태예요)"
 
     # 1. 휴대폰 사용 시간
     if phone > 5:
         weight = int(4 * work_factor)
         if weight > 0:
-            problem_items.append(('휴대폰 사용 시간', phone, f'하루 {phone:.1f}시간 사용 (권장 3시간 이하){work_note}', weight))
+            problem_items.append(('휴대폰 사용 시간', phone, f'하루 {phone:.1f}시간 사용하고 있어요 (권장 3시간 이하){work_note}', weight))
     elif phone > 3:
         weight = int(2 * work_factor)
         if weight > 0:
-            problem_items.append(('휴대폰 사용 시간', phone, f'하루 {phone:.1f}시간 사용 (권장 3시간 이하){work_note}', weight))
+            problem_items.append(('휴대폰 사용 시간', phone, f'하루 {phone:.1f}시간 사용하고 있어요 (권장 3시간 이하){work_note}', weight))
 
     # 2. 근무 시간
     if work_hours > 9:
-        problem_items.append(('근무 시간', work_hours, f'하루 {work_hours:.1f}시간 근무 (권장 8시간 이하) - 과로 상태', 4))
+        problem_items.append(('근무 시간', work_hours, f'하루 {work_hours:.1f}시간 근무하고 있어요 (권장 8시간 이하) - 과로 상태예요', 4))
     elif work_hours > 8:
-        problem_items.append(('근무 시간', work_hours, f'하루 {work_hours:.1f}시간 근무 (권장 8시간 이하) - 장시간 근무', 3))
+        problem_items.append(('근무 시간', work_hours, f'하루 {work_hours:.1f}시간 근무하고 있어요 (권장 8시간 이하) - 장시간 근무예요', 3))
 
     # 3. 운동
     if workout < 0.5:
         weight = int(2 * work_factor)
         if weight > 0:
-            problem_items.append(('운동 부족', workout, f'하루 {workout*60:.0f}분 운동 (권장 30분 이상){work_note}', weight))
+            problem_items.append(('운동 부족', workout, f'하루 {workout*60:.0f}분 운동하고 있어요 (권장 30분 이상){work_note}', weight))
 
     # 4. 카페인 (기준 150mg)
     if caffeine > 200:
         weight = int(3 * work_factor)
         if weight > 0:
-            problem_items.append(('카페인 과다', caffeine, f'카페인 {caffeine:.0f}mg (권장 200mg 이하){work_note}', weight))
+            problem_items.append(('카페인 과다', caffeine, f'카페인 {caffeine:.0f}mg 섭취하고 있어요 (권장 200mg 이하){work_note}', weight))
     elif caffeine > 150:
         weight = int(2 * work_factor)
         if weight > 0:
-            problem_items.append(('카페인 섭취', caffeine, f'카페인 {caffeine:.0f}mg (권장 150mg 이하){work_note}', weight))
+            problem_items.append(('카페인 섭취', caffeine, f'카페인 {caffeine:.0f}mg 섭취하고 있어요 (권장 150mg 이하){work_note}', weight))
 
     # 가중치 기준으로 정렬
     problem_items.sort(key=lambda x: x[3], reverse=True)
@@ -131,6 +131,7 @@ def analyze_fatigue_cause_with_weight(workout, phone, work_hours, caffeine):
             rank_str.append(f"{i}순위: {name} - {desc}")
         return "🔍 피로 원인 순위: " + " | ".join(rank_str)
 
+
 # =====================================================
 # 6. 피로 원인 상세 분석 함수 (가중치 없이 원본 데이터)
 # =====================================================
@@ -139,43 +140,45 @@ def analyze_fatigue_cause_detail(workout, phone, work_hours, caffeine):
     
     # 1. 휴대폰 사용 시간
     if phone > 5:
-        causes.append(f"휴대폰 사용 시간 {phone:.1f}시간 - 하루 5시간 이상 사용 시 수면 질 저하, 블루라이트가 멜라토닌 분비 방해")
+        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 - 하루 5시간 이상 사용하면 수면 질이 저하되고, 블루라이트가 멜라토닌 분비를 방해할 수 있어요")
     elif phone > 3:
-        causes.append(f"휴대폰 사용 시간 {phone:.1f}시간 - 적정 수준이나 취침 1시간 전 사용은 피하는 것이 좋습니다")
+        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 - 적정 수준이지만, 취침 1시간 전에는 사용을 피하는 게 좋아요")
     else:
-        causes.append(f"휴대폰 사용 시간 {phone:.1f}시간 - 양호한 수준, 현재 패턴 유지")
+        causes.append(f"📱 휴대폰 사용 시간 {phone:.1f}시간 - 양호한 수준이에요, 현재 패턴을 유지해주세요")
     
     # 2. 근무 시간
     if work_hours > 9:
-        causes.append(f"근무 {work_hours:.1f}시간 - 과로 상태, 업무 스트레스가 수면의 질을 크게 저하시킵니다")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 과로 상태예요, 업무 스트레스가 수면의 질을 크게 저하시킬 수 있어요")
     elif work_hours > 8:
-        causes.append(f"근무 {work_hours:.1f}시간 - 장시간 근무로 인한 피로 누적, 퇴근 후 충분한 휴식 필요")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 장시간 근무로 피로가 누적되고 있어요, 퇴근 후 충분히 쉬어주세요")
     elif work_hours <= 2:
-        causes.append(f"근무 {work_hours:.1f}시간 - 근무 시간이 매우 짧아 충분한 여유가 있습니다")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 매우 짧아 충분히 여유로워요")
     elif work_hours <= 4:
-        causes.append(f"근무 {work_hours:.1f}시간 - 근무 시간이 짧아 여유로운 생활이 가능합니다")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 짧아 여유로운 생활이 가능해요")
     elif work_hours <= 6:
-        causes.append(f"근무 {work_hours:.1f}시간 - 근무 시간이 적당합니다")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 적당해요")
     else:
-        causes.append(f"근무 {work_hours:.1f}시간 - 적정 근무 시간, 현재 패턴 유지")
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 적정 근무 시간이에요, 현재 패턴을 유지해주세요")
     
     # 3. 운동
-    if workout < 0.5:
-        causes.append(f"운동 부족 (하루 {workout:.1f}시간) - 규칙적인 운동은 수면의 질을 30% 이상 향상시킵니다")
+    if workout > 3:
+        causes.append(f"🏃 운동 시간 {workout:.1f}시간 - 운동량이 너무 많아요. 과도한 운동은 오히려 피로를 쌓을 수 있으니 적당히 조절해주세요")
+    elif workout < 0.5:
+        causes.append(f"🏃 운동 부족 (하루 {workout:.1f}시간) - 규칙적인 운동은 수면의 질을 30% 이상 향상시킬 수 있어요")
     elif workout > 1.5:
-        causes.append(f"적절한 운동 (하루 {workout:.1f}시간) - 좋은 수면 습관을 유지하고 있습니다")
+        causes.append(f"🏃 적절한 운동 (하루 {workout:.1f}시간) - 좋은 수면 습관을 유지하고 계세요")
     else:
-        causes.append(f"운동 {workout:.1f}시간 - 적정 수준, 꾸준히 유지하세요")
+        causes.append(f"🏃 운동 {workout:.1f}시간 - 적정 수준이에요, 꾸준히 유지해주세요")
     
     # 4. 카페인 (기준 150mg)
     if caffeine > 200:
-        causes.append(f"카페인 {caffeine:.0f}mg - 과다 섭취, 오후 3시 이후 카페인 섭취는 수면을 방해합니다")
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 과다 섭취하고 있어요, 오후 3시 이후에는 카페인 섭취를 피하는 게 좋아요")
     elif caffeine > 150:
-        causes.append(f"카페인 {caffeine:.0f}mg - 적정 범위 초과, 취침 6시간 전까지 섭취를 줄이는 것이 좋습니다")
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 적정 범위를 초과했어요, 취침 6시간 전까지는 카페인 섭취를 줄이는 게 좋아요")
     elif caffeine > 0:
-        causes.append(f"카페인 {caffeine:.0f}mg - 적정 수준, 현재 패턴 유지")
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 적정 수준이에요, 현재 패턴을 유지해주세요")
     else:
-        causes.append(f"카페인 없음 - 양호함")
+        causes.append(f"☕ 카페인 없음 - 양호해요")
     
     return causes
 
