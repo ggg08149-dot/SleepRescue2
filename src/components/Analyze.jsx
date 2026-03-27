@@ -23,6 +23,7 @@ const PLAN_DATA = [
 function Analyze({ backHome, updateResult, startCoaching, userName = '사용자' }) {
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false); // AI 분석 중 중복 클릭 방지
   const [drinks, setDrinks] = useState([]);
   const [result, setResult] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -181,6 +182,8 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
 // --------------------[피로지수, 피로도 계산 + DB 저장]---------------------------------------------------
   const doAnalyze = async () => {
+    if (analyzing) return; // 중복 클릭 방지
+
     // 입력값 검증
     if (!lifestyleData.workout || !lifestyleData.phone ||
         !lifestyleData.workHours || !lifestyleData.sleepTime) {
@@ -203,6 +206,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     const caffeineMg   = getTotalCaffeineMg();
     const BASE = 'http://localhost:7000';
 
+    setAnalyzing(true);
     try {
       // ── STEP 1: 생활패턴 저장 ────────────────────
       const lifelogRes = await fetch(`${BASE}/api/lifelog/save`, {
@@ -301,6 +305,8 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     } catch (error) {
       console.error('분석 오류:', error);
       alert(`분석 중 오류가 발생했습니다: ${error.message}`);
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -619,7 +625,9 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         </div>
 
           {/* -------------------------------------- */}
-          <button className="analyze-btn" onClick={doAnalyze}>🔍 AI 분석 시작하기</button>
+          <button className="analyze-btn" onClick={doAnalyze} disabled={analyzing}>
+            {analyzing ? '⏳ 분석 중...' : '🔍 AI 분석 시작하기'}
+          </button>
         </div>
       </div>
 
