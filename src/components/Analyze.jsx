@@ -292,7 +292,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         sleepScorePoint: sleepScore,
         avg3:            70,
         fatigue,
-        fatigueCause:    fatigueData.fatigue_cause   || '분석 중 오류가 발생했습니다.',
+        fatigueCause:    fatigueData.fatigue_cause   || '복합적 요인',
         fatigueDetails:  fatigueData.fatigue_details || []
       };
 
@@ -433,7 +433,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         {/* 점수 표시 (선택사항) */}
         {scanned && (
           <div style={{ color: 'var(--accent)', fontWeight: 'bold', marginTop: '10px' }}>
-            다크서클 점수: {darkScore}점
+            눈가 컨디션: {darkScore}점
           </div>
         )}
       </div>
