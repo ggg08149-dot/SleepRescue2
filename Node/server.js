@@ -161,6 +161,21 @@ app.post('/api/predict', (req, res) => {
   });
 });
 
+// ─── 인증 상태 확인 API ───────────────────────
+// GET /api/auth/check → JWT 토큰 검증 (req.session 대신 JWT 사용)
+app.get('/api/auth/check', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.json({ valid: false });
+
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    res.json({ valid: true, user_idx: decoded.id });
+  } catch {
+    res.json({ valid: false });
+  }
+});
+
 // ─── 현재 비밀번호 확인 API ──────────────────
 // 주소: POST http://localhost:7000/api/user/verify-password
 app.post('/api/user/verify-password', async (req, res) => {

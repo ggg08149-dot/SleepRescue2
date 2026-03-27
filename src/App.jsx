@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Home from './components/Home';
 import Analyze from './components/Analyze';
 import Coaching from './components/Coaching';
@@ -28,6 +28,41 @@ function App() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(7);
 
+  // ── 앱 시작 시 인증 상태 확인 ──────────────────
+  useEffect(() => {
+    if (authScreen !== 'app') return; // 로그인 전이면 스킵
+    const token = localStorage.getItem('token');
+    if (!token) {
+      forceLogout();
+      return;
+    }
+    fetch('http://localhost:7000/api/auth/check', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.valid) forceLogout();
+      })
+      .catch(() => {
+        // 서버 연결 실패 시에는 로그아웃 강제하지 않음
+      });
+  }, []);
+
+  const forceLogout = () => {
+    sessionStorage.clear();
+    localStorage.removeItem('authScreen');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('token');
+    setAuthScreen('login');
+    setUserName('사용자');
+    setUserEmail('user@email.com');
+    setUserId('');
+    setScreen('home');
+    setActiveTab('home');
+  };
+
   const trigTransition = (cb) => {
     setTransitioning(true);
     setTimeout(() => { cb(); setTransitioning(false); }, 350);
@@ -48,10 +83,12 @@ function App() {
   };
 
   const handleLogout = () => {
+    sessionStorage.clear();
     localStorage.removeItem('authScreen');
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userId');
+    localStorage.removeItem('token');
     setAuthScreen('login');
     setUserName('사용자');
     setUserEmail('user@email.com');
