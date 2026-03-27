@@ -306,12 +306,14 @@ app.post('/api/fatigue/save', (req, res) => {
 
     const { sleep_score, predicted_hours, fatigue_cause, fatigue_details } = mlResult;
 
+    // 피로도 레벨 결정
     let fatigue_level = 'low';
     if (sleep_score < 30) fatigue_level = 'high';
     else if (sleep_score < 70) fatigue_level = 'mid';
 
     const analysis_result = JSON.stringify(fatigue_details || []);
 
+    // tb_fatigue INSERT
     const insertSql = `INSERT INTO tb_fatigue (file_idx, lifelog_idx, fatigue_score, fatigue_reason, fatigue_level, analysis_result)
                        VALUES (?, ?, ?, ?, ?, ?)`;
     db.query(insertSql, [file_idx, lifelog_idx, sleep_score, fatigue_cause, fatigue_level, analysis_result], (err) => {
@@ -320,6 +322,7 @@ app.post('/api/fatigue/save', (req, res) => {
         return res.status(500).json({ success: false, message: 'fatigue 저장에 실패했습니다.' });
       }
 
+      // tb_lifelog sleep_score UPDATE
       db.query('UPDATE tb_lifelog SET sleep_score = ? WHERE lifelog_idx = ?', [sleep_score, lifelog_idx], (err2) => {
         if (err2) {
           console.error('❌ lifelog 업데이트 오류:', err2);
