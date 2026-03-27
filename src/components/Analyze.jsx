@@ -35,7 +35,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   // -------------------------------------------------
   const [lifestyleData, setLifestyleData] = useState({
     workout: '',      // 운동시간 (h)
-    phone: '',        // 폰 사용 시간 (h)
+    phone: '',        // 휴대폰 사용 시간 (h)
     workHours: '',    // 근무시간 (h)
     sleepTime: ''     // 수면시간 (h)
     });
@@ -179,7 +179,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       };
 
 
-// --------------------[피로지수, 피로도 계산]----------------------------------------------------------------
+// --------------------[피로지수, 피로도 계산 + DB 저장]---------------------------------------------------
   const doAnalyze = async () => {
     // 입력값 검증
     if (!lifestyleData.workout || !lifestyleData.phone ||
@@ -205,7 +205,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
     try {
       // ── STEP 1: 생활패턴 저장 ────────────────────
-      const lifelogRes  = await fetch(`${BASE}/api/lifelog/save`, {
+      const lifelogRes = await fetch(`${BASE}/api/lifelog/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -225,15 +225,13 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       const lifelog_idx = lifelogData.lifelog_idx;
 
       // ── STEP 2: 파일 메타데이터 저장 ─────────────
-      const fileName   = `capture_${Date.now()}.jpg`;
-      const fileSize   = capturedBlob ? capturedBlob.size : 0;
-      const fileRes    = await fetch(`${BASE}/api/file/save`, {
+      const fileRes = await fetch(`${BASE}/api/file/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_idx,
-          file_name: fileName,
-          file_size: fileSize,
+          file_name: `capture_${Date.now()}.jpg`,
+          file_size: capturedBlob ? capturedBlob.size : 0,
           file_ext:  'jpg'
         })
       });
@@ -245,7 +243,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       const file_idx = fileData.file_idx;
 
       // ── STEP 3: 다크서클 점수 저장 ───────────────
-      const dcRes  = await fetch(`${BASE}/api/darkcircle/save`, {
+      const dcRes = await fetch(`${BASE}/api/darkcircle/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_idx, user_idx, dc_score: darkScore })
@@ -257,7 +255,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       }
 
       // ── STEP 4: ML 실행 + 피로도 저장 ────────────
-      const fatigueRes  = await fetch(`${BASE}/api/fatigue/save`, {
+      const fatigueRes = await fetch(`${BASE}/api/fatigue/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -270,56 +268,28 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           sleepTime: sleepHours
         })
       });
-<<<<<<< HEAD
       const fatigueData = await fatigueRes.json();
       if (!fatigueData.success) {
         alert(`ML 분석 실패: ${fatigueData.message}`);
         return;
       }
 
-      // ── 결과 화면 처리 ────────────────────────────
+      // ── 피로도 공식 : 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore ──
+      const sleepScore   = fatigueData.sleep_score;
+      const fatigueScore = 100 - (darkScore * 0.3) - (sleepScore * 0.7);
+
       let fatigue = 'low';
-      if (fatigueData.sleep_score < 30) fatigue = 'high';
-      else if (fatigueData.sleep_score < 70) fatigue = 'mid';
+      if (fatigueScore >= 70) fatigue = 'high';
+      else if (fatigueScore > 30) fatigue = 'mid';
 
       const res = {
-        darkCircle:     darkScore,
-        sleepScore:     fatigueData.predicted_hours,
-        sleepScorePoint: fatigueData.sleep_score,
-        avg3:           70,
+        darkCircle:      darkScore,
+        sleepScore:      fatigueData.predicted_hours,
+        sleepScorePoint: sleepScore,
+        avg3:            70,
         fatigue,
-        fatigueCause:   fatigueData.fatigue_cause   || '분석 중 오류가 발생했습니다.',
-        fatigueDetails: fatigueData.fatigue_details || []
-=======
-      
-      const data = await response.json();
-      
-      // 피로도 공식 : 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore
-      // 현재 darkScore와 sleepScore는 값이 클수록 좋은 상태임
-      // 피로지수는 낮을수록 좋은상태로 만들고 싶어서 이렇게 정의함
-      const currentDarkScore = darkScore;
-      const sleepScore = data.sleep_score;
-      const fatigueScore = 100 - (currentDarkScore * 0.3) - (sleepScore * 0.7);
-
-      // 피로지수 70이상: 피로도 높음, 30~70점: 주의, 330점 이하: 낮음
-      let fatigue = 'low';
-      if (fatigueScore >= 70) {
-        fatigue = 'high';
-      } else if (fatigueScore > 30) {
-        fatigue = 'mid';
-      } else {
-        fatigue = 'low';
-      }
-      
-      const res = {
-        darkCircle: currentDarkScore,
-        sleepScore: data.predicted_hours,
-        sleepScorePoint: data.sleep_score,
-        avg3: 70,
-        fatigue: fatigue,
-        fatigueCause: data.fatigue_cause || '분석 중 오류가 발생했습니다.',  // ← 피로 원인 추가
-      fatigueDetails: data.fatigue_details || []  // ← 상세 원인 추가
->>>>>>> de02909 (analyze)
+        fatigueCause:    fatigueData.fatigue_cause   || '분석 중 오류가 발생했습니다.',
+        fatigueDetails:  fatigueData.fatigue_details || []
       };
 
       setResult(res);
@@ -491,7 +461,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           </div>
           <div className="input-row" style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
             <div className="input-group">
-              <div className="input-label">폰 사용 (h)</div>
+              <div className="input-label">휴대폰 사용시간 (h)</div>
               <input 
                 className="input-field" 
                 type="number" 
