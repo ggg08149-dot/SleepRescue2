@@ -65,80 +65,81 @@ def get_asymmetric_sleep_score(predicted_hours):
     return round(score, 1)
 
 # =====================================================
-# 5. 피로 원인 분석 함수 (추가)
+# 5. 피로 원인 분석 함수 (휴식시간 고려)
 # =====================================================
-def analyze_fatigue_cause(workout, phone, work_hours, caffeine, relaxation, sleep_score):
+def analyze_fatigue_cause(workout, phone, work_hours, caffeine, relaxation):
     causes = []
+    problem_items = []  # (이름, 값, 설명, 가중치)
     
-    # 변수 중요도 기반 분석
+    # 1. 폰 사용 분석
     if phone > 5:
-        causes.append(f"📱 하루 {phone:.1f}시간 폰 사용")
-        if phone > 7:
-            causes.append("   → 수면 시간을 1.5시간 이상 단축시킬 수 있습니다.")
-        elif phone > 5:
-            causes.append("   → 취침 전 블루라이트가 멜라토닌 분비를 방해합니다.")
-    
-    if work_hours > 9:
-        causes.append(f"💼 하루 {work_hours:.1f}시간 근무 (과로)")
-        causes.append("   → 과로로 인한 스트레스가 수면의 질을 저하시킵니다.")
-    elif work_hours > 8:
-        causes.append(f"💼 하루 {work_hours:.1f}시간 근무")
-        causes.append("   → 업무 스트레스로 인해 숙면에 어려움을 겪을 수 있습니다.")
-    
-    if workout < 0.5:
-        causes.append(f"🏃 운동 부족 (하루 {workout:.1f}시간)")
-        causes.append("   → 규칙적인 운동은 수면의 질을 30% 이상 향상시킵니다.")
-    elif workout > 1.5:
-        causes.append(f"🏃 적절한 운동 (하루 {workout:.1f}시간)")
-        causes.append("   → 좋은 수면 습관을 유지하고 있습니다.")
-    
-    if relaxation < 0.5:
-        causes.append(f"😌 휴식 시간 부족 (하루 {relaxation:.1f}시간)")
-        causes.append("   → 스트레스 해소 시간이 필요합니다.")
-    elif relaxation > 1:
-        causes.append(f"😌 충분한 휴식 시간 (하루 {relaxation:.1f}시간)")
-        causes.append("   → 스트레스 관리가 잘 되고 있습니다.")
-    
-    if caffeine > 200:
-        causes.append(f"☕ 과도한 카페인 섭취 ({caffeine:.0f}mg)")
-        causes.append("   → 오후 3시 이후 카페인 섭취는 수면을 방해합니다.")
-    elif caffeine > 100:
-        causes.append(f"☕ 카페인 섭취 ({caffeine:.0f}mg)")
-        causes.append("   → 취침 6시간 전까지 카페인 섭취를 줄이는 것이 좋습니다.")
-    
-    # 수면 점수 기반 분석
-    if sleep_score < 30:
-        causes.append(f"😴 심각한 수면 부족 (수면 점수 {sleep_score}점)")
-        causes.append("   → 즉각적인 수면 패턴 개선이 필요합니다.")
-    elif sleep_score < 70:
-        causes.append(f"⚠️ 수면 개선 필요 (수면 점수 {sleep_score}점)")
-        causes.append("   → 규칙적인 수면 습관이 필요합니다.")
-    
-    # 종합 원인 요약
-    if len(causes) == 0:
-        return "모든 항목이 양호한 상태입니다. 현재 생활 패턴을 유지하세요."
-    
-    # 주요 원인 추출
-    main_causes = []
-    if phone > 5:
-        main_causes.append("폰 사용 시간")
-    if work_hours > 8:
-        main_causes.append("근무 시간")
-    if workout < 0.5:
-        main_causes.append("운동 부족")
-    if relaxation < 0.5:
-        main_causes.append("휴식 부족")
-    if caffeine > 100:
-        main_causes.append("카페인 섭취")
-    
-    if len(main_causes) >= 2:
-        summary = f"{', '.join(main_causes[:2])} 등이 피로의 주요 원인입니다."
-    elif len(main_causes) == 1:
-        summary = f"{main_causes[0]}이(가) 피로의 주요 원인입니다."
+        problem_items.append(('📱 폰 사용', phone, f'하루 {phone:.1f}시간 사용 (권장 3시간 이하)', 4))
+        causes.append(f"📱 폰 사용 {phone:.1f}시간 - 하루 5시간 이상 사용 시 수면 질 저하, 블루라이트가 멜라토닌 분비 방해")
+    elif phone > 3:
+        problem_items.append(('📱 폰 사용', phone, f'하루 {phone:.1f}시간 사용 (권장 3시간 이하)', 2))
+        causes.append(f"📱 폰 사용 {phone:.1f}시간 - 적정 수준이나 취침 1시간 전 사용은 피하는 것이 좋습니다")
     else:
-        summary = "수면 패턴 개선이 필요합니다."
+        causes.append(f"📱 폰 사용 {phone:.1f}시간 - 양호한 수준, 현재 패턴 유지")
     
-    # 상세 원인과 함께 반환
+    # 2. 근무 시간 분석
+    if work_hours > 9:
+        problem_items.append(('💼 근무 시간', work_hours, f'하루 {work_hours:.1f}시간 근무 (권장 8시간 이하)', 4))
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 과로 상태, 업무 스트레스가 수면의 질을 크게 저하시킵니다")
+    elif work_hours > 8:
+        problem_items.append(('💼 근무 시간', work_hours, f'하루 {work_hours:.1f}시간 근무 (권장 8시간 이하)', 3))
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 장시간 근무로 인한 피로 누적, 퇴근 후 충분한 휴식 필요")
+    elif work_hours < 6:
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 근무 시간이 짧아 여유가 있으나, 규칙적인 생활 패턴 유지 필요")
+    else:
+        causes.append(f"💼 근무 {work_hours:.1f}시간 - 적정 근무 시간, 현재 패턴 유지")
+    
+    # 3. 운동 분석
+    if workout < 0.5:
+        problem_items.append(('🏃 운동 부족', workout, f'하루 {workout*60:.0f}분 운동 (권장 30분 이상)', 2))
+        causes.append(f"🏃 운동 부족 (하루 {workout:.1f}시간) - 규칙적인 운동은 수면의 질을 30% 이상 향상시킵니다")
+    elif workout > 1.5:
+        causes.append(f"🏃 적절한 운동 (하루 {workout:.1f}시간) - 좋은 수면 습관을 유지하고 있습니다")
+    else:
+        causes.append(f"🏃 운동 {workout:.1f}시간 - 적정 수준, 꾸준히 유지하세요")
+    
+    # 4. 휴식 분석 (휴식시간은 24시간에서 다른 항목을 빼서 나오는 값)
+    # 적정 휴식시간: 3~6시간 (너무 적으면 피로, 너무 많으면 활동 부족)
+    if relaxation < 2:
+        problem_items.append(('😌 휴식 부족', relaxation, f'하루 {relaxation:.1f}시간 휴식 (권장 3~6시간)', 3))
+        causes.append(f"😌 휴식 부족 (하루 {relaxation:.1f}시간) - 휴식 시간이 너무 적습니다. 여유 시간을 확보하세요")
+    elif relaxation > 6:
+        problem_items.append(('😌 휴식 과다', relaxation, f'하루 {relaxation:.1f}시간 휴식 (권장 3~6시간)', 2))
+        causes.append(f"😌 휴식 과다 (하루 {relaxation:.1f}시간) - 휴식이 너무 많습니다. 활동적인 시간을 늘려보세요")
+    elif relaxation < 3:
+        problem_items.append(('😌 휴식 약간 부족', relaxation, f'하루 {relaxation:.1f}시간 휴식 (권장 3~6시간)', 1))
+        causes.append(f"😌 휴식 {relaxation:.1f}시간 - 약간 부족합니다. 30분~1시간 더 휴식 시간을 가지세요")
+    elif relaxation <= 6:
+        causes.append(f"😌 휴식 {relaxation:.1f}시간 - 적정 수준, 취침 전 가벼운 명상 추천")
+    
+    # 5. 카페인 분석
+    if caffeine > 200:
+        problem_items.append(('☕ 카페인 과다', caffeine, f'카페인 {caffeine:.0f}mg (권장 200mg 이하)', 3))
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 과다 섭취, 오후 3시 이후 카페인 섭취는 수면을 방해합니다")
+    elif caffeine > 100:
+        problem_items.append(('☕ 카페인 섭취', caffeine, f'카페인 {caffeine:.0f}mg (권장 100mg 이하)', 2))
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 적정 범위 초과, 취침 6시간 전까지 섭취를 줄이는 것이 좋습니다")
+    elif caffeine > 0:
+        causes.append(f"☕ 카페인 {caffeine:.0f}mg - 적정 수준, 현재 패턴 유지")
+    else:
+        causes.append(f"☕ 카페인 없음 - 양호함")
+    
+    # 가중치 기준으로 정렬 (높은 순)
+    problem_items.sort(key=lambda x: x[3], reverse=True)
+    
+    # 순위 매기기 (문제 있는 항목만)
+    if len(problem_items) == 0:
+        summary = "✅ 모든 항목이 양호한 상태입니다. 현재 생활 패턴을 유지하세요."
+    else:
+        rank_str = []
+        for i, (name, val, desc, weight) in enumerate(problem_items, 1):
+            rank_str.append(f"{i}순위: {name} - {desc}")
+        summary = "🔍 피로 원인 순위: " + " | ".join(rank_str)
+    
     return {
         "summary": summary,
         "details": causes
