@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Webcam from 'react-webcam';
-import axios from 'axios';
+import { useAnalyze } from '../hooks/useAnalyze';
 
 const getFatigueMessage = (fatigue, userName, causeName) => {
   if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
@@ -21,40 +21,35 @@ const PLAN_DATA = [
 ];
 
 function Analyze({ backHome, updateResult, startCoaching, userName = '사용자' }) {
-  const [scanned, setScanned] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false); // AI 분석 중 중복 클릭 방지
-  const [drinks, setDrinks] = useState([]);
-  const [result, setResult] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-
-  // 분석결과를 화면에 보여주기 위한 상태들
-  const [darkScore, setDarkScore] = useState(0); 
-  const [statusMsg, setStatusMsg] = useState("준비 완료");
-  const [analyzedImg, setAnalyzedImg] = useState(null); // 분석된 이미지(Base64) 저장
-  const [capturedBlob, setCapturedBlob] = useState(null); // 파일 저장용 Blob
-  // -------------------------------------------------
+  const [drinks, setDrinks]               = useState([]);
+  const [selectedPlan, setSelectedPlan]   = useState(null);
   const [lifestyleData, setLifestyleData] = useState({
-    workout: '',      // 운동시간 (h)
-    phone: '',        // 휴대폰 사용 시간 (h)
-    workHours: '',    // 근무시간 (h)
-    sleepTime: ''     // 수면시간 (h)
-    });
-  // ---------------------------------------------------
+    workout  : '',   // 운동시간 (h)
+    phone    : '',   // 휴대폰 사용 시간 (h)
+    workHours: '',   // 근무시간 (h)
+    sleepTime: '',   // 수면시간 (h)
+  });
+
+  const {
+    scanned, scanning, analyzing,
+    darkScore, analyzedImg, result,
+    doScan, doAnalyze, resetScan,
+  } = useAnalyze();
+
   const resultRef = useRef(null);
-  const webcamRef = useRef(null); // 웹캠 참조를 위한 ref
+  const webcamRef = useRef(null);
 
   //----------------------- [카페인 mg 계산 함수]------------------------------------------------------------
   const getTotalCaffeineMg = () => {
     if (drinks.includes('🚫 없음')) return 0;
-    
+
     const caffeineMap = {
       '☕ 아메리카노': 120,
       '🧋 라떼': 80,
       '⚡ 에너지음료': 160,
       '🍵 녹차': 30
     };
-    
+
     let total = 0;
     drinks.forEach(drink => {
       const match = drink.match(/([☕🧋⚡🍵].*?)\s*(\d+)잔/);
@@ -64,9 +59,16 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         total += (caffeineMap[drinkName] || 0) * count;
       }
     });
-    
+
     return total;
   };
+
+  // ─── 훅 함수 바인딩 ────────────────────────
+  const handleScan    = () => doScan(webcamRef);
+  const handleAnalyze = () => doAnalyze(lifestyleData, getTotalCaffeineMg, (res) => {
+    updateResult(res);
+    setTimeout(() => { resultRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+  });
 
   // 버튼 클릭 시 잔 수 증가
   const addDrink = (drinkName) => {
@@ -133,182 +135,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     return drinks.includes('🚫 없음');
   };
 
-// ----------------------[YOLO 분석 함수]----------------------------------------------------------------------
-  const doScan = async () => {
-    if (scanning) return;
-
-    setScanning(true);
-    setStatusMsg("분석 중..."); // 상태 업데이트
-
-    try {
-          if (!webcamRef.current) throw new Error("카메라를 찾을 수 없습니다.");
-
-          // 1. 웹캠에서 사진 캡처
-          const imageSrc = webcamRef.current.getScreenshot(); 
-          if (!imageSrc) throw new Error("캡처에 실패했습니다.");
-
-          // 2. 서버 전송을 위해 Blob으로 변환
-          const imageRes = await fetch(imageSrc);
-          const imageBlob = await imageRes.blob();
-          setCapturedBlob(imageBlob); // doAnalyze()에서 파일 크기 사용
-          const formData = new FormData();
-          formData.append('file', imageBlob, 'capture.jpg'); 
-
-          // 3. FastAPI 서버로 전송 (YOLO 분석)
-          const response = await axios.post('http://127.0.0.1:8000/predict/yolo', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-          
-        if (response.data.status === "success") {
-          // ✅ 선언한 상태 변수 이름에 맞춰서 저장
-          setDarkScore(response.data.dark_circle_score);
-          setAnalyzedImg(response.data.result_image); // "data:image/jpeg;base64,..." 형태
-          setScanned(true);
-          setStatusMsg("분석 완료");
-          console.log("분석 성공:", response.data.dark_circle_score);
-        } else {
-          alert("다크서클 검출에 실패했습니다. 조명을 밝게 하고 다시 시도해주세요.");
-        }
-
-        } catch (error) {
-          console.error("분석 실패:", error);
-          setScanning(false);
-          alert("서버 연결에 실패했습니다. FastAPI 서버(8000포트)가 실행 중인지 확인해주세요!");
-        } finally {
-          setScanning(false); // 성공하든 실패하든 로딩 해제
-        }
-      };
-
-
-// --------------------[피로지수, 피로도 계산 + DB 저장]---------------------------------------------------
-  const doAnalyze = async () => {
-    if (analyzing) return; // 중복 클릭 방지
-
-    // 입력값 검증
-    if (!lifestyleData.workout || !lifestyleData.phone ||
-        !lifestyleData.workHours || !lifestyleData.sleepTime) {
-      alert('운동시간, 폰 사용시간, 근무시간, 수면시간을 모두 입력해주세요!');
-      return;
-    }
-    if (!scanned) {
-      alert('먼저 웹캠 촬영 및 분석을 진행해주세요!');
-      return;
-    }
-
-    const user_idx = sessionStorage.getItem('user_idx');
-    if (!user_idx) {
-      alert('로그인이 필요합니다.');
-      return;
-    }
-
-    const workoutHours = parseFloat(lifestyleData.workout);
-    const sleepHours   = parseFloat(lifestyleData.sleepTime);
-    const caffeineMg   = getTotalCaffeineMg();
-    const BASE = 'http://localhost:7000';
-
-    setAnalyzing(true);
-    try {
-      // ── STEP 1: 생활패턴 저장 ────────────────────
-      const lifelogRes = await fetch(`${BASE}/api/lifelog/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_idx,
-          exec_hours:  workoutHours,
-          phone_hours: parseFloat(lifestyleData.phone),
-          work_hours:  parseFloat(lifestyleData.workHours),
-          caffeine:    caffeineMg,
-          sleep_hours: sleepHours
-        })
-      });
-      const lifelogData = await lifelogRes.json();
-      if (!lifelogData.success) {
-        alert(`생활패턴 저장 실패: ${lifelogData.message}`);
-        return;
-      }
-      const lifelog_idx = lifelogData.lifelog_idx;
-
-      // ── STEP 2: 파일 메타데이터 저장 ─────────────
-      const fileRes = await fetch(`${BASE}/api/file/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_idx,
-          file_name: `capture_${Date.now()}.jpg`,
-          file_size: capturedBlob ? capturedBlob.size : 0,
-          file_ext:  'jpg'
-        })
-      });
-      const fileData = await fileRes.json();
-      if (!fileData.success) {
-        alert(`파일 저장 실패: ${fileData.message}`);
-        return;
-      }
-      const file_idx = fileData.file_idx;
-
-      // ── STEP 3: 다크서클 점수 저장 ───────────────
-      const dcRes = await fetch(`${BASE}/api/darkcircle/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_idx, user_idx, dc_score: darkScore })
-      });
-      const dcData = await dcRes.json();
-      if (!dcData.success) {
-        alert(`다크서클 저장 실패: ${dcData.message}`);
-        return;
-      }
-
-      // ── STEP 4: ML 실행 + 피로도 저장 ────────────
-      const fatigueRes = await fetch(`${BASE}/api/fatigue/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_idx,
-          lifelog_idx,
-          workout:   workoutHours,
-          phone:     parseFloat(lifestyleData.phone),
-          workHours: parseFloat(lifestyleData.workHours),
-          caffeine:  caffeineMg,
-          sleepTime: sleepHours
-        })
-      });
-      const fatigueData = await fatigueRes.json();
-      if (!fatigueData.success) {
-        alert(`ML 분석 실패: ${fatigueData.message}`);
-        return;
-      }
-
-      // ── 피로도 공식 : 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore ──
-      const sleepScore   = fatigueData.sleep_score;
-      const fatigueScore = 100 - (darkScore * 0.3) - (sleepScore * 0.7);
-
-      let fatigue = 'low';
-      if (fatigueScore >= 70) fatigue = 'high';
-      else if (fatigueScore > 30) fatigue = 'mid';
-
-      const res = {
-        darkCircle:      darkScore,
-        sleepScore:      fatigueData.predicted_hours,
-        sleepScorePoint: sleepScore,
-        avg3:            70,
-        fatigue,
-        fatigueCause:    fatigueData.fatigue_cause   || '복합적 요인',
-        fatigueDetails:  fatigueData.fatigue_details || []
-      };
-
-      setResult(res);
-      updateResult(res);
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-
-    } catch (error) {
-      console.error('분석 오류:', error);
-      alert(`분석 중 오류가 발생했습니다: ${error.message}`);
-    } finally {
-      setAnalyzing(false);
-    }
-  };
 
   const handleSelectPlan = (n) => {
     setSelectedPlan(n);
@@ -417,16 +243,11 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         
         <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
           {!scanned ? (
-            <button className="scan-btn" onClick={doScan} disabled={scanning}>
+            <button className="scan-btn" onClick={handleScan} disabled={scanning}>
               {scanning ? "분석 중..." : "📷 촬영 및 분석"}
             </button>
           ) : (
-            <button onClick={() => {
-                setScanned(false);
-                setAnalyzedImg(null);
-                setCapturedBlob(null);
-                setResult(null);
-              }} className="retry-btn">↺ 다시 촬영하기</button>
+            <button onClick={resetScan} className="retry-btn">↺ 다시 촬영하기</button>
           )}
         </div>
         
@@ -625,7 +446,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         </div>
 
           {/* -------------------------------------- */}
-          <button className="analyze-btn" onClick={doAnalyze} disabled={analyzing}>
+          <button className="analyze-btn" onClick={handleAnalyze} disabled={analyzing}>
             {analyzing ? '⏳ 분석 중...' : '🔍 AI 분석 시작하기'}
           </button>
         </div>
