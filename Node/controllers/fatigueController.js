@@ -70,6 +70,7 @@ const saveFatigue = (req, res) => {
             success        : true,
             sleep_score,
             predicted_hours,
+            fatigue_score: final_fatigue_score,
             fatigue_level,
             fatigue_cause,
             fatigue_details: fatigue_details || [],
