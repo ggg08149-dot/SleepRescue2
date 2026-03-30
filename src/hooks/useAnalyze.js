@@ -112,6 +112,7 @@ export const useAnalyze = () => {
         sleepScore     : fatigueData.predicted_hours,
         sleepScorePoint: fatigueData.sleep_score,
         avg3           : 70,
+        fatigueScore   : fatigueData.fatigue_score,
         fatigue        : fatigueData.fatigue_level,
         fatigueCause   : fatigueData.fatigue_cause   || '복합적 요인',
         fatigueDetails : fatigueData.fatigue_details || [],
