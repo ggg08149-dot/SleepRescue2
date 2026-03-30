@@ -5,7 +5,10 @@
       "Bash(curl -s http://localhost:7000/)",
       "Bash(curl -s -X POST http://localhost:7000/api/login -H \"Content-Type: application/json\" -d \"{\"\"email\"\":\"\"test@test.com\"\",\"\"password\"\":\"\"test123\"\"}\")",
       "Bash(timeout 8 node server.js)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 15 npm run dev)",
+      "Bash(timeout 12 npm run dev)"
     ]
   }
 }

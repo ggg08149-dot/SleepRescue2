@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId = '', onLogout }) {
 
@@ -16,6 +17,7 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
   });
   const [currentPwValid, setCurrentPwValid] = useState(null); // null | true | false
   const [pwMatch, setPwMatch] = useState(null); // null | true | false
+  const { verifyPassword, changePassword } = useAuth();
 
 
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -35,20 +37,8 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
 
   const verifyCurrentPassword = async (pw) => {
     if (!pw) { setCurrentPwValid(null); return; }
-    try {
-      const res = await fetch('http://localhost:7000/api/user/verify-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ currentPassword: pw }),
-      });
-      const data = await res.json();
-      setCurrentPwValid(data.success);
-    } catch {
-      setCurrentPwValid(null);
-    }
+    const data = await verifyPassword(pw);
+    setCurrentPwValid(data.success ?? null);
   };
 
   const handleChangePassword = async () => {
@@ -64,27 +54,15 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
       showToast('⚠ 비밀번호는 6자 이상이어야 합니다');
       return;
     }
-    try {
-      const response = await fetch('http://localhost:7000/api/user/password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ currentPassword: pwForm.currentPw, newPassword: pwForm.newPw }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        showToast('✓ 비밀번호가 변경되었습니다');
-        setPwForm({ currentPw: '', newPw: '', newPwConfirm: '' });
-        setCurrentPwValid(null);
-        setPwMatch(null);
-        setSection(null);
-      } else {
-        showToast(`⚠ ${data.message}`);
-      }
-    } catch {
-      showToast('⚠ 서버 연결에 실패했습니다');
+    const data = await changePassword(pwForm.currentPw, pwForm.newPw);
+    if (data.success) {
+      showToast('✓ 비밀번호가 변경되었습니다');
+      setPwForm({ currentPw: '', newPw: '', newPwConfirm: '' });
+      setCurrentPwValid(null);
+      setPwMatch(null);
+      setSection(null);
+    } else {
+      showToast(`⚠ ${data.message || '서버 연결에 실패했습니다'}`);
     }
   };
 
