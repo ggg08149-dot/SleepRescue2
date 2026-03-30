@@ -8,6 +8,7 @@ from PIL import Image
 import numpy as np
 import cv2
 import base64
+import math
 
 app = FastAPI()
 
@@ -92,28 +93,52 @@ async def predict_yolo(file: UploadFile = File(...)):
     }
 
 # --- [방법 B] ML: 수면 시간 및 점수 예측 ---
+# [이식할 가우시안 점수 함수]
+def get_asymmetric_sleep_score(predicted_hours):
+    SLEEP_TARGET_HOURS = 7.5
+    SIGMA_UNDER = 3.8
+    SIGMA_OVER = 5.0
+    
+    if predicted_hours <= SLEEP_TARGET_HOURS:
+        sigma = SIGMA_UNDER
+    else:
+        sigma = SIGMA_OVER
+    
+    # 가우시안 종 모양 곡선 로직
+    score = 100 * math.exp(-((predicted_hours - SLEEP_TARGET_HOURS) ** 2) / (2 * sigma ** 2))
+    return round(score, 1)
+
 @app.post("/predict/ml")
 async def predict_ml(
-    workout: float = Form(...), 
-    phone: float = Form(...), 
-    work: float = Form(...), 
-    caffeine: float = Form(...), 
-    relax: float = Form(...)
+    workout: float, 
+    phone: float, 
+    workHours: float, 
+    caffeine: float, 
+    sleepTime: float
 ):
-    # 팀원들이 입력한 데이터를 데이터프레임으로 변환
+    
+# 1. 휴식 시간(RelaxationTime) 자동 계산 (이것도 원래 코드에 있었네요!)
+    # 24시간에서 나머지 활동을 뺀 값
+    relaxation = max(0, 24 - (workout + phone + workHours + sleepTime))
+
+    # 2. 데이터프레임 변환
     df = pd.DataFrame([{
         'WorkoutTime': workout, 
         'PhoneTime': phone, 
-        'WorkHours': work, 
+        'WorkHours': workHours, 
         'CaffeineIntake': caffeine, 
-        'RelaxationTime': relax
+        'RelaxationTime': relaxation
     }])
     
-    # XGBoost 예측 실행
+    # 3. XGBoost 예측 실행
     pred_hours = round(float(ml_model.predict(df)[0]), 1)
+    
+    # 4. 드디어 찾은 그 로직으로 점수 계산!
+    sleep_score = get_asymmetric_sleep_score(pred_hours)
     
     return {
         "status": "success",
-        "predicted_sleep_hours": pred_hours,
+        "sleep_score": sleep_score,        # Node.js가 기다리는 70% 비중의 그 점수!
+        "predicted_hours": pred_hours,
         "message": "생활 데이터 기반 수면 분석 완료"
     }

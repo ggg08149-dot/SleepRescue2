@@ -6,7 +6,7 @@ const FASTAPI  = 'http://127.0.0.1:8000';
 export const analyzeDarkcircle = async (imageBlob) => {
   const formData = new FormData();
   formData.append('file', imageBlob, 'capture.jpg');
-  const res = await axios.post(`${FASTAPI}/predict/darkcircle`, formData, {
+  const res = await axios.post(`${FASTAPI}/predict/yolo`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return res.data;

@@ -13,7 +13,7 @@ class LifestyleInput(BaseModel):
     sleepTime: float
 
 
-@router.post("/predict/lifestyle")
+@router.post("/predict/ml")
 async def predict_lifestyle_route(data: LifestyleInput):
     print("📊 생활패턴 데이터 수신! ML 분석 시작...")
     return predict_lifestyle(
