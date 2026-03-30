@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -173,8 +174,8 @@ function SignUp({ goLogin, goHome }) {
   });
   const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
   const [showCal, setShowCal] = useState(false);
+  const { loading, signupUser } = useAuth();
 
   const sleepIssues = [
     { id: 'insomnia', label: '불면증' },
@@ -218,31 +219,17 @@ function SignUp({ goLogin, goHome }) {
   };
 
   const handleSignUp = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('http://localhost:7000/api/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name     : form.name,
-          email    : form.email,
-          password : form.password,
-          birthdate: form.birthdate,
-          gender   : form.gender,
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        goHome(form.name, form.email);
-      } else {
-        alert(data.message);
-      }
-    } catch (err) {
-      alert('서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
-    } finally {
-      setLoading(false);
+    const data = await signupUser({
+      name     : form.name,
+      email    : form.email,
+      password : form.password,
+      birthdate: form.birthdate,
+      gender   : form.gender,
+    });
+    if (data.success) {
+      goHome(form.name, form.email);
+    } else {
+      alert(data.message || '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
     }
   };
 
