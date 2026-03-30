@@ -104,7 +104,7 @@ const trigTransition = (cb) => {
       case 'home':
         return <Home goAnalyze={goAnalyze} analysisResult={analysisResult} startCoaching={startCoaching} userName={userName} />;
       case 'analyze':
-        return <Analyze backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} />;
+        return <Analyze userName={userName} userIdx={localStorage.getItem('user_idx')} backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} />;
       case 'coaching':
         return <Coaching selectedPlan={selectedPlan} analysisResult={analysisResult} />;
       case 'mypage':
