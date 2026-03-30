@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 function Login({ goHome, goSignUp }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { loading, loginUser } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -20,27 +21,13 @@ function Login({ goHome, goSignUp }) {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await fetch('http://localhost:7000/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        localStorage.setItem('token', data.token);
-        sessionStorage.setItem('user_idx', data.user_idx);
-        goHome(data.userName, data.userEmail, data.userId);
-      } else {
-        setError(data.message);
-      }
-    } catch (err) {
-      setError('서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
-    } finally {
-      setLoading(false);
+    const data = await loginUser(email, password);
+    if (data.success) {
+      localStorage.setItem('token', data.token);
+      sessionStorage.setItem('user_idx', data.user_idx);
+      goHome(data.userName, data.userEmail, data.userId);
+    } else {
+      setError(data.message || '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
     }
   };
 
