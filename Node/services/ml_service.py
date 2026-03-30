@@ -3,8 +3,8 @@ import pandas as pd
 from models_loader.loader import ml_model
 
 SLEEP_TARGET_HOURS = 7.5
-SIGMA_UNDER        = 1.8
-SIGMA_OVER         = 4.2
+SIGMA_UNDER        = 3.8
+SIGMA_OVER         = 5.0
 
 
 def _get_asymmetric_sleep_score(predicted_hours: float) -> float:

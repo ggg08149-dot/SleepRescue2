@@ -107,20 +107,12 @@ export const useAnalyze = () => {
       });
       if (!fatigueData.success) { alert(`ML 분석 실패: ${fatigueData.message}`); return; }
 
-      // 피로도 공식: 피로지수 = 100 - 0.3*darkScore - 0.7*sleepScore
-      const sleepScore   = fatigueData.sleep_score;
-      const fatigueScore = 100 - (darkScore * 0.3) - (sleepScore * 0.7);
-
-      let fatigue = 'low';
-      if (fatigueScore >= 70) fatigue = 'high';
-      else if (fatigueScore > 30) fatigue = 'mid';
-
       const res = {
         darkCircle     : darkScore,
         sleepScore     : fatigueData.predicted_hours,
-        sleepScorePoint: sleepScore,
+        sleepScorePoint: fatigueData.sleep_score,
         avg3           : 70,
-        fatigue,
+        fatigue        : fatigueData.fatigue_level,
         fatigueCause   : fatigueData.fatigue_cause   || '복합적 요인',
         fatigueDetails : fatigueData.fatigue_details || [],
       };
