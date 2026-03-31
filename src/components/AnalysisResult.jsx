@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFatigueHistory, deleteFatigueRecord } from '../api/fatigueApi';
+import { savePlan } from '../api/planApi';
 
 const getFatigueMessage = (fatigue, userName, causeName) => {
   if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
@@ -30,7 +31,7 @@ const toResultProps = (row) => ({
 });
 
 // ─── 결과 카드 (단일) ────────────────────────────
-export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching }) {
+export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching, planSaving = false }) {
   if (!result) return null;
   const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue) || FATIGUE_LEVELS[0];
   const causeName = result.fatigueCause === '모든 항목이 양호한 상태입니다.'
@@ -117,9 +118,15 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
       </div>
       {selectedPlan && (
         <button className="analyze-btn" onClick={onStartCoaching}
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', marginTop: '8px' }}>
-          🚀 {selectedPlan}일 플랜 진행하기
+          style={{ background: planSaving ? 'rgba(124,58,237,0.5)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)', marginTop: '8px', fontSize: '15px', fontWeight: 700 }}
+          disabled={planSaving}>
+          {planSaving ? '⏳ 저장 중...' : `🚀 ${selectedPlan}일 플랜 진행하기`}
         </button>
+      )}
+      {!selectedPlan && (
+        <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted)', marginTop: '8px', padding: '8px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.12)' }}>
+          플랜을 선택하면 진행하기 버튼이 활성화됩니다
+        </div>
       )}
     </div>
   );
@@ -135,8 +142,25 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
   const [history, setHistory]           = useState([]);
   const [expanded, setExpanded]         = useState(false);  // 펼쳐보기 상태
   const [viewItem, setViewItem]         = useState(null);   // 상세보기 중인 DB 레코드
+  const [planSaving, setPlanSaving]     = useState(false);
 
   const displayResult = currentResult || existingResult;
+
+  // 플랜 저장 후 코칭 화면 이동
+  const handleStartCoaching = async (planN) => {
+    if (!planN) return;
+    setPlanSaving(true);
+    try {
+      if (userIdx) {
+        await savePlan(userIdx, planN);
+      }
+    } catch (e) {
+      console.error('플랜 저장 실패:', e);
+    } finally {
+      setPlanSaving(false);
+    }
+    startCoaching(planN);
+  };
 
   // DB에서 히스토리 불러오기
   const fetchHistory = async () => {
@@ -181,11 +205,16 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
       {viewItem ? (
         <>
           <button onClick={() => setViewItem(null)} style={{
-            background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)',
-            padding: '6px 14px', borderRadius: '8px', cursor: 'pointer',
-            fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px', marginBottom: '14px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: 'linear-gradient(135deg, rgba(110,231,247,0.15), rgba(110,231,247,0.08))',
+            border: '1px solid rgba(110,231,247,0.4)',
+            color: '#6ee7f7',
+            padding: '10px 20px', borderRadius: '10px', cursor: 'pointer',
+            fontFamily: "'Noto Sans KR', sans-serif", fontSize: '14px', fontWeight: 600,
+            marginBottom: '14px', width: '100%', justifyContent: 'center',
+            boxShadow: '0 0 10px rgba(110,231,247,0.15)',
           }}>
-            ← 목록으로
+            ← 목록으로 돌아가기
           </button>
           <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '10px' }}>
             📅 {viewItem.savedAt} 분석 결과
@@ -195,7 +224,8 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
             userName={userName}
             selectedPlan={selectedPlan}
             onSelectPlan={setSelectedPlan}
-            onStartCoaching={() => { if (selectedPlan) startCoaching(selectedPlan); }}
+            onStartCoaching={() => handleStartCoaching(selectedPlan)}
+            planSaving={planSaving}
           />
         </>
       ) : (
@@ -207,7 +237,8 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
               userName={userName}
               selectedPlan={selectedPlan}
               onSelectPlan={setSelectedPlan}
-              onStartCoaching={() => { if (selectedPlan) startCoaching(selectedPlan); }}
+              onStartCoaching={() => handleStartCoaching(selectedPlan)}
+              planSaving={planSaving}
             />
           ) : (
             <div style={{

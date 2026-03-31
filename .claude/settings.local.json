@@ -9,7 +9,9 @@
       "Bash(npm install:*)",
       "Bash(timeout 15 npm run dev)",
       "Bash(timeout 12 npm run dev)",
-      "Bash(grep -r \"Bearer\\\\|localStorage\\\\|sessionStorage\" C:UsersSMHRD-OneDriveDesktopSleepRescue2src --include=*.js --include=*.jsx)"
+      "Bash(grep -r \"Bearer\\\\|localStorage\\\\|sessionStorage\" C:UsersSMHRD-OneDriveDesktopSleepRescue2src --include=*.js --include=*.jsx)",
+      "Bash(find C:UsersSMHRD-OneDriveDesktopSleepRescue2 -name *.js -path */routes/* -o -name *route* -type f)",
+      "Bash(grep -r plan C:UsersSMHRD-OneDriveDesktopSleepRescue2/Node --include=*.js)"
     ]
   }
 }
