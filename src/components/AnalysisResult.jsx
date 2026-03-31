@@ -140,20 +140,33 @@ const fatigueIcon  = (f) => f === 'high' ? '🔥' : f === 'mid' ? '⚠️' : '�
 function AnalysisResult({ currentResult, existingResult, userName, userIdx, startCoaching, onSwitchToScan }) {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [history, setHistory]           = useState([]);
-  const [expanded, setExpanded]         = useState(false);  // 펼쳐보기 상태
-  const [viewItem, setViewItem]         = useState(null);   // 상세보기 중인 DB 레코드
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [expanded, setExpanded]         = useState(false);
+  const [viewItem, setViewItem]         = useState(null);
   const [planSaving, setPlanSaving]     = useState(false);
 
-  const displayResult = currentResult || existingResult;
+  // history[0]을 fallback으로: 새로고침·재시작 시에도 최근 기록 표시
+  const latestFromDB  = history.length > 0 ? toResultProps(history[0]) : null;
+  const displayResult = currentResult || existingResult || latestFromDB;
+
+  // 날짜 라벨 계산 (currentResult는 방금 분석한 결과 → 미표기)
+  const dateLabel = (() => {
+    if (currentResult) return null;
+    const src = existingResult || latestFromDB;
+    if (!src?.savedAt) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const rec   = new Date(src.savedAt); rec.setHours(0, 0, 0, 0);
+    const diff  = Math.round((today - rec) / 86400000);
+    if (diff <= 0) return null;
+    return `${diff}일 전 기록입니다`;
+  })();
 
   // 플랜 저장 후 코칭 화면 이동
   const handleStartCoaching = async (planN) => {
     if (!planN) return;
     setPlanSaving(true);
     try {
-      if (userIdx) {
-        await savePlan(userIdx, planN);
-      }
+      if (userIdx) await savePlan(userIdx, planN);
     } catch (e) {
       console.error('플랜 저장 실패:', e);
     } finally {
@@ -164,12 +177,14 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
 
   // DB에서 히스토리 불러오기
   const fetchHistory = async () => {
-    if (!userIdx) return;
+    if (!userIdx) { setHistoryLoading(false); return; }
     try {
       const res = await getFatigueHistory(userIdx);
       if (res.success) setHistory(res.data || []);
     } catch (e) {
       console.error('히스토리 조회 실패:', e);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -194,9 +209,8 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     }
   };
 
-  // 표시할 히스토리 목록 (최신 결과와 중복 제거: 현재 결과가 있으면 첫 번째 건너뜀)
-  const historyList = history;
-  const visibleCount = expanded ? historyList.length : 2;
+  const historyList    = history;
+  const visibleCount   = expanded ? historyList.length : 2;
   const visibleHistory = historyList.slice(0, visibleCount);
 
   return (
@@ -230,16 +244,32 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
         </>
       ) : (
         <>
-          {/* 현재 분석 결과 */}
-          {displayResult ? (
-            <ResultCard
-              result={displayResult}
-              userName={userName}
-              selectedPlan={selectedPlan}
-              onSelectPlan={setSelectedPlan}
-              onStartCoaching={() => handleStartCoaching(selectedPlan)}
-              planSaving={planSaving}
-            />
+          {/* 현재/최근 분석 결과 */}
+          {historyLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)', fontSize: '13px' }}>
+              ⏳ 분석 기록을 불러오는 중...
+            </div>
+          ) : displayResult ? (
+            <>
+              {dateLabel && (
+                <div style={{
+                  marginBottom: '10px', padding: '8px 14px',
+                  background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)',
+                  borderRadius: '10px', fontSize: '12px', color: 'var(--accent2)',
+                  textAlign: 'center', fontWeight: 500,
+                }}>
+                  📅 {dateLabel}
+                </div>
+              )}
+              <ResultCard
+                result={displayResult}
+                userName={userName}
+                selectedPlan={selectedPlan}
+                onSelectPlan={setSelectedPlan}
+                onStartCoaching={() => handleStartCoaching(selectedPlan)}
+                planSaving={planSaving}
+              />
+            </>
           ) : (
             <div style={{
               textAlign: 'center', padding: '50px 20px',
