@@ -23,4 +23,12 @@ const saveLifelog = (req, res) => {
   );
 };
 
-module.exports = { saveLifelog };
+const getLatest = (req, res) => {
+  const { user_idx } = req.params;
+  lifelogModel.getLatestByUser(user_idx, (err, data) => {
+    if (err) return res.status(500).json({ success: false, message: 'DB 조회 오류' });
+    res.json({ success: true, data });
+  });
+};
+
+module.exports = { saveLifelog, getLatest };
