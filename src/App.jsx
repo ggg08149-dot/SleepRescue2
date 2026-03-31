@@ -9,7 +9,7 @@ import './App.css';
 import './Auth.css';
 
 function App() {
-  const [authScreen, setAuthScreen] = useState('login');
+  const [authScreen, setAuthScreen] = useState(localStorage.getItem('token') ? 'app' : 'login');
   const [userName, setUserName] = useState(
     localStorage.getItem('userName') || '사용자'
   );
@@ -27,11 +27,11 @@ function App() {
   const [selectedPlan, setSelectedPlan]     = useState(7);
 
   const forceLogout = () => {
-    sessionStorage.clear();
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userId');
     localStorage.removeItem('token');
+    localStorage.removeItem('user_idx');
     setAuthScreen('login');
     setUserName('사용자');
     setUserEmail('user@email.com');
@@ -59,11 +59,11 @@ function App() {
   };
 
   const handleLogout = () => {
-    sessionStorage.clear();
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userId');
     localStorage.removeItem('token');
+    localStorage.removeItem('user_idx');
     setAuthScreen('login');
     setUserName('사용자');
     setUserEmail('user@email.com');

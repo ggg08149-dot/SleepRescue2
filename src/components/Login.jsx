@@ -46,7 +46,7 @@ function Login({ goHome, goSignUp }) {
         localStorage.removeItem(AUTO_LOGIN_KEY);
       }
       localStorage.setItem('token', data.token);
-      sessionStorage.setItem('user_idx', data.user_idx);
+      localStorage.setItem('user_idx', data.user_idx);
       goHome(data.userName, data.userEmail, data.userId);
     } else {
       setError(data.message || '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');

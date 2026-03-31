@@ -62,7 +62,7 @@ export const useAnalyze = () => {
       alert('먼저 웹캠 촬영 및 분석을 진행해주세요!');
       return;
     }
-    const user_idx = sessionStorage.getItem('user_idx');
+    const user_idx = localStorage.getItem('user_idx');
     if (!user_idx) { alert('로그인이 필요합니다.'); return; }
 
     const workoutHours = parseFloat(lifestyleData.workout);
