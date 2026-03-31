@@ -35,3 +35,13 @@ export const getCalendarFatigue = async (user_idx, year, month) => {
   const res = await fetch(`${BASE}/api/fatigue/calendar/${user_idx}/${year}/${month}`);
   return res.json();
 };
+
+export const getFatigueHistory = async (user_idx) => {
+  const res = await fetch(`${BASE}/api/fatigue/history/${user_idx}`);
+  return res.json();
+};
+
+export const deleteFatigueRecord = async (fatigue_idx, user_idx) => {
+  const res = await fetch(`${BASE}/api/fatigue/${fatigue_idx}/${user_idx}`, { method: 'DELETE' });
+  return res.json();
+};

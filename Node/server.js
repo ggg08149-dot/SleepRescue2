@@ -10,6 +10,7 @@ const lifelogRoutes    = require('./routes/lifelogRoutes');
 const fileRoutes       = require('./routes/fileRoutes');
 const darkcircleRoutes = require('./routes/darkcircleRoutes');
 const fatigueRoutes    = require('./routes/fatigueRoutes');
+const planRoutes       = require('./routes/planRoutes');
 
 const app  = express();
 const PORT = 7000;
@@ -29,6 +30,7 @@ app.use('/api', lifelogRoutes);
 app.use('/api', fileRoutes);
 app.use('/api', darkcircleRoutes);
 app.use('/api', fatigueRoutes);
+app.use('/api', planRoutes);
 
 // ─── 서버 시작 ───────────────────────────────
 app.listen(PORT, () => {

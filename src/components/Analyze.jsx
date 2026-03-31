@@ -1,11 +1,10 @@
 import React, { useState, useRef } from 'react';
 import Webcam from 'react-webcam';
 import { useAnalyze } from '../hooks/useAnalyze';
-import AnalysisResult, { ResultCard } from './AnalysisResult';
+import AnalysisResult from './AnalysisResult';
 
 function Analyze({ backHome, updateResult, startCoaching, userName = '사용자', userIdx, existingResult }) {
   const [drinks, setDrinks]               = useState([]);
-  const [selectedPlan, setSelectedPlan]   = useState(null);
   const [lifestyleData, setLifestyleData] = useState({
     workout  : '',
     phone    : '',
@@ -13,7 +12,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     sleepTime: '',
   });
   const [viewTab, setViewTab] = useState('scan'); // 'scan' | 'result'
-  const [showInlineResult, setShowInlineResult] = useState(false); // 스캔탭 내 결과 표시
 
   const {
     scanned, scanning, analyzing,
@@ -21,7 +19,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     doScan, doAnalyze, resetScan,
   } = useAnalyze();
 
-  const resultRef = useRef(null);
   const webcamRef = useRef(null);
 
   const displayResult = result || existingResult;
@@ -43,8 +40,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
   const handleAnalyze = () => doAnalyze(lifestyleData, getTotalCaffeineMg, (res) => {
     updateResult(res);
-    setShowInlineResult(true); // 스캔탭에서 결과 바로 표시
-    setTimeout(() => { resultRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    setViewTab('result'); // 분석 완료 시 결과 탭으로 자동 전환
   });
 
   // ─── 음료 관련 ────────────────────────────────
@@ -167,7 +163,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                   {scanning ? '분석 중...' : '📷 촬영 및 분석'}
                 </button>
               ) : (
-                <button onClick={() => { resetScan(); setShowInlineResult(false); }} className="retry-btn">↺ 다시 촬영하기</button>
+                <button onClick={() => resetScan()} className="retry-btn">↺ 다시 촬영하기</button>
               )}
             </div>
 
@@ -259,27 +255,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
             </div>
           </div>
 
-          {/* 스캔 탭 내 인라인 결과 (분석 완료 시 바로 표시) */}
-          {showInlineResult && result && (
-            <div ref={resultRef}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div className="section-title" style={{ margin: 0 }}>📊 분석 결과</div>
-                <button
-                  onClick={() => setViewTab('result')}
-                  style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)', color: 'var(--accent2)', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer', fontFamily: "'Noto Sans KR', sans-serif", fontSize: '11px' }}
-                >
-                  결과 탭에서 보기 →
-                </button>
-              </div>
-              <ResultCard
-                result={result}
-                userName={userName}
-                selectedPlan={selectedPlan}
-                onSelectPlan={setSelectedPlan}
-                onStartCoaching={() => { if (selectedPlan) startCoaching(selectedPlan); }}
-              />
-            </div>
-          )}
         </>
       )}
 
@@ -289,6 +264,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           currentResult={displayResult}
           existingResult={existingResult}
           userName={userName}
+          userIdx={userIdx}
           startCoaching={startCoaching}
           onSwitchToScan={() => setViewTab('scan')}
         />
