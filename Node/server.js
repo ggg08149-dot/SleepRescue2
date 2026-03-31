@@ -1,6 +1,7 @@
 // 진입점 - 앱 설정 및 포트 실행만 담당
 const express = require('express');
 const cors    = require('cors');
+const coachingRoutes = require('./routes/coachingRoutes'); // <--- 추가!
 require('dotenv').config();
 
 require('./config/db'); // DB 연결 초기화
@@ -31,6 +32,7 @@ app.use('/api', fileRoutes);
 app.use('/api', darkcircleRoutes);
 app.use('/api', fatigueRoutes);
 app.use('/api', planRoutes);
+app.use('/api/coaching', coachingRoutes); // <--- 이 줄을 추가하세요!
 
 // ─── 서버 시작 ───────────────────────────────
 app.listen(PORT, () => {

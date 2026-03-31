@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import Webcam from 'react-webcam';
 import { useAnalyze } from '../hooks/useAnalyze';
 import AnalysisResult from './AnalysisResult';
+import axios from 'axios';
 
 function Analyze({ backHome, updateResult, startCoaching, userName = '사용자', userIdx, existingResult }) {
   const [drinks, setDrinks]               = useState([]);
@@ -38,10 +39,25 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   // ─── 핸들러 ───────────────────────────────────
   const handleScan = () => doScan(webcamRef);
 
-  const handleAnalyze = () => doAnalyze(lifestyleData, getTotalCaffeineMg, (res) => {
-    updateResult(res);
-    setViewTab('result'); // 분석 완료 시 결과 탭으로 자동 전환
-  });
+  const handleAnalyze = () => {
+    // 1. doAnalyze 실행 (콜백 함수 앞에 async를 붙여야 await 사용 가능!)
+    doAnalyze(lifestyleData, getTotalCaffeineMg, async (res) => {
+      updateResult(res);
+      setViewTab('result'); // 분석 완료 시 결과 탭으로 자동 전환
+
+      // 🚀 [추가] 분석 결과가 나오자마자 노드 서버의 GPT 코칭 호출!
+      try {
+        console.log("GPT 코칭을 요청합니다...");
+        const gptRes = await axios.post('http://localhost:7000/api/coaching/analyze', {
+          user_idx: userIdx, 
+        });
+        console.log("GPT 답변 수신 성공:", gptRes.data.solutions);
+        // 여기서 setGptSolutions(gptRes.data.solutions) 같은 걸로 저장하면 베스트!
+      } catch (err) {
+        console.error("GPT 코칭 호출 실패:", err);
+      }
+    }); // <--- doAnalyze를 닫는 괄호
+  }; // <--- handleAnalyze 전체를 닫는 괄호
 
   // ─── 음료 관련 ────────────────────────────────
   const addDrink = (drinkName) => {
