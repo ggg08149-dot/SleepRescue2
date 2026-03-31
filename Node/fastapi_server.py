@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.yolo_router import router as yolo_router
 from routers.ml_router   import router as ml_router
+from routers.coaching_router import router as coaching_router # 1. 이거 추가!
 
 app = FastAPI()
 
@@ -17,3 +18,6 @@ app.add_middleware(
 
 app.include_router(yolo_router)
 app.include_router(ml_router)
+app.include_router(yolo_router)
+app.include_router(ml_router)
+app.include_router(coaching_router) # 2. 이거 추가! (이제 주소 활성화됨)
