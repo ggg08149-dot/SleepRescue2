@@ -107,4 +107,31 @@ const predict = (req, res) => {
   });
 };
 
-module.exports = { saveFatigue, predict };
+// 최근 피로지수 1건
+const getLatest = (req, res) => {
+  const { user_idx } = req.params;
+  fatigueModel.getLatestByUser(user_idx, (err, data) => {
+    if (err) return res.status(500).json({ success: false, message: 'DB 조회 오류' });
+    res.json({ success: true, data });
+  });
+};
+
+// 주간 피로지수 최대 7건
+const getWeekly = (req, res) => {
+  const { user_idx } = req.params;
+  fatigueModel.getWeeklyByUser(user_idx, (err, data) => {
+    if (err) return res.status(500).json({ success: false, message: 'DB 조회 오류' });
+    res.json({ success: true, data });
+  });
+};
+
+// 캘린더용: 월별 일자별 최신 피로지수
+const getCalendar = (req, res) => {
+  const { user_idx, year, month } = req.params;
+  fatigueModel.getCalendarByUser(user_idx, year, month, (err, data) => {
+    if (err) return res.status(500).json({ success: false, message: 'DB 조회 오류' });
+    res.json({ success: true, data });
+  });
+};
+
+module.exports = { saveFatigue, predict, getLatest, getWeekly, getCalendar };

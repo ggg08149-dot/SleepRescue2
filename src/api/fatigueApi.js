@@ -20,3 +20,18 @@ export const saveFatigue = async (data) => {
   });
   return res.json();
 };
+
+export const getLatestFatigue = async (user_idx) => {
+  const res = await fetch(`${BASE}/api/fatigue/latest/${user_idx}`);
+  return res.json();
+};
+
+export const getWeeklyFatigue = async (user_idx) => {
+  const res = await fetch(`${BASE}/api/fatigue/weekly/${user_idx}`);
+  return res.json();
+};
+
+export const getCalendarFatigue = async (user_idx, year, month) => {
+  const res = await fetch(`${BASE}/api/fatigue/calendar/${user_idx}/${year}/${month}`);
+  return res.json();
+};

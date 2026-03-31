@@ -8,3 +8,8 @@ export const saveLifelog = async (data) => {
   });
   return res.json();
 };
+
+export const getLatestLifelog = async (user_idx) => {
+  const res = await fetch(`${BASE}/api/lifelog/latest/${user_idx}`);
+  return res.json();
+};
