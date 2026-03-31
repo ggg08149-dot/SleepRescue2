@@ -20,11 +20,11 @@ function App() {
     localStorage.getItem('userId') || ''
   );
 
-  const [activeTab, setActiveTab] = useState('home');
-  const [screen, setScreen] = useState('home');
+  const [activeTab, setActiveTab]     = useState('home');
+  const [screen, setScreen]           = useState('home');
   const [transitioning, setTransitioning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(7);
+  const [selectedPlan, setSelectedPlan]     = useState(7);
 
   const forceLogout = () => {
     sessionStorage.clear();
@@ -40,22 +40,22 @@ function App() {
     setActiveTab('home');
   };
 
-const trigTransition = (cb) => {
+  const trigTransition = (cb) => {
     setTransitioning(true);
     setTimeout(() => { cb(); setTransitioning(false); }, 350);
   };
 
   const handleLoginSuccess = (name, email, id) => {
-    const safeName = name || '사용자';
+    const safeName  = name  || '사용자';
     const safeEmail = email || 'user@email.com';
-    const safeId = id || '';
+    const safeId    = id    || '';
     setUserName(safeName);
     setUserEmail(safeEmail);
     setUserId(safeId);
     setAuthScreen('app');
-    localStorage.setItem('userName', safeName);
+    localStorage.setItem('userName',  safeName);
     localStorage.setItem('userEmail', safeEmail);
-    localStorage.setItem('userId', safeId);
+    localStorage.setItem('userId',    safeId);
   };
 
   const handleLogout = () => {
@@ -77,7 +77,7 @@ const trigTransition = (cb) => {
   };
 
   const goAnalyze = () => {
-    trigTransition(() => setScreen('analyze'));
+    trigTransition(() => { setScreen('analyze'); setActiveTab('analyze'); });
   };
 
   const backHome = () => {
@@ -93,8 +93,10 @@ const trigTransition = (cb) => {
     trigTransition(() => { setScreen('coaching'); setActiveTab('coaching'); });
   };
 
+  // ─── 하단 탭 4개 ─────────────────────────────
   const tabs = [
     { id: 'home',     label: '홈',   icon: '🏠' },
+    { id: 'analyze',  label: '분석', icon: '🔍' },
     { id: 'coaching', label: '코칭', icon: '💬' },
     { id: 'mypage',   label: '마이', icon: '👤' },
   ];
@@ -102,15 +104,55 @@ const trigTransition = (cb) => {
   const renderScreen = () => {
     switch (screen) {
       case 'home':
-        return <Home goAnalyze={goAnalyze} analysisResult={analysisResult} startCoaching={startCoaching} userName={userName} />;
+        return (
+          <Home
+            goAnalyze={goAnalyze}
+            analysisResult={analysisResult}
+            startCoaching={startCoaching}
+            userName={userName}
+          />
+        );
+
       case 'analyze':
-        return <Analyze userName={userName} userIdx={localStorage.getItem('user_idx')} backHome={backHome} updateResult={updateResult} startCoaching={startCoaching} />;
+        return (
+          <Analyze
+            userName={userName}
+            userIdx={localStorage.getItem('user_idx')}
+            backHome={backHome}
+            updateResult={updateResult}
+            startCoaching={startCoaching}
+            // 기존 분석결과 전달 → 탭에서도 결과 볼 수 있게
+            existingResult={analysisResult}
+          />
+        );
+
       case 'coaching':
-        return <Coaching selectedPlan={selectedPlan} analysisResult={analysisResult} />;
+        return (
+          <Coaching
+            selectedPlan={selectedPlan}
+            analysisResult={analysisResult}
+          />
+        );
+
       case 'mypage':
-        return <MyPage userName={userName} userEmail={userEmail} userId={userId} onLogout={handleLogout} />;
+        return (
+          <MyPage
+            userName={userName}
+            userEmail={userEmail}
+            userId={userId}
+            onLogout={handleLogout}
+          />
+        );
+
       default:
-        return <Home goAnalyze={goAnalyze} analysisResult={analysisResult} startCoaching={startCoaching} userName={userName} />;
+        return (
+          <Home
+            goAnalyze={goAnalyze}
+            analysisResult={analysisResult}
+            startCoaching={startCoaching}
+            userName={userName}
+          />
+        );
     }
   };
 
