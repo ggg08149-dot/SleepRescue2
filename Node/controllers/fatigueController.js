@@ -134,4 +134,25 @@ const getCalendar = (req, res) => {
   });
 };
 
-module.exports = { saveFatigue, predict, getLatest, getWeekly, getCalendar };
+// 분석 히스토리 최신순 20건
+const getHistory = (req, res) => {
+  const { user_idx } = req.params;
+  fatigueModel.getHistoryByUser(user_idx, (err, data) => {
+    if (err) return res.status(500).json({ success: false, message: 'DB 조회 오류' });
+    res.json({ success: true, data });
+  });
+};
+
+// 분석 결과 삭제 (연관 레코드 연쇄 삭제)
+const deleteOne = (req, res) => {
+  const { fatigue_idx, user_idx } = req.params;
+  fatigueModel.deleteWithCascade(fatigue_idx, user_idx, (err) => {
+    if (err) {
+      if (err.message === '권한 없음 또는 데이터 없음') return res.status(403).json({ success: false, message: err.message });
+      return res.status(500).json({ success: false, message: 'DB 삭제 오류' });
+    }
+    res.json({ success: true });
+  });
+};
+
+module.exports = { saveFatigue, predict, getLatest, getWeekly, getCalendar, getHistory, deleteOne };

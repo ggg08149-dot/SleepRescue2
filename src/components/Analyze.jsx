@@ -43,8 +43,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
 
   const handleAnalyze = () => doAnalyze(lifestyleData, getTotalCaffeineMg, (res) => {
     updateResult(res);
-    setShowInlineResult(true); // 스캔탭에서 결과 바로 표시
-    setTimeout(() => { resultRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    setViewTab('result'); // 분석 완료 시 결과 탭으로 자동 전환
   });
 
   // ─── 음료 관련 ────────────────────────────────
@@ -289,6 +288,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           currentResult={displayResult}
           existingResult={existingResult}
           userName={userName}
+          userIdx={userIdx}
           startCoaching={startCoaching}
           onSwitchToScan={() => setViewTab('scan')}
         />

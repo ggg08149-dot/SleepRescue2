@@ -67,4 +67,48 @@ const getCalendarByUser = (user_idx, year, month, cb) => {
   });
 };
 
-module.exports = { insert, getLatestByUser, getWeeklyByUser, getCalendarByUser };
+// 분석 히스토리 (최신순 20건)
+const getHistoryByUser = (user_idx, cb) => {
+  const sql = `
+    SELECT f.fatigue_idx, f.fatigue_score, f.fatigue_level,
+           f.fatigue_reason, f.analysis_result,
+           f.file_idx, f.lifelog_idx,
+           DATE_FORMAT(l.created_at, '%Y-%m-%d %H:%i') AS created_at
+    FROM tb_fatigue f
+    JOIN tb_lifelog l ON f.lifelog_idx = l.lifelog_idx
+    WHERE l.user_idx = ?
+    ORDER BY f.fatigue_idx DESC
+    LIMIT 20`;
+  db.query(sql, [user_idx], (err, rows) => {
+    if (err) return cb(err, null);
+    cb(null, rows || []);
+  });
+};
+
+// 분석 결과 완전 삭제 (소유권 검증 + 연관 레코드 연쇄 삭제)
+const deleteWithCascade = (fatigue_idx, user_idx, cb) => {
+  const getSql = `
+    SELECT f.file_idx, f.lifelog_idx
+    FROM tb_fatigue f
+    JOIN tb_lifelog l ON f.lifelog_idx = l.lifelog_idx
+    WHERE f.fatigue_idx = ? AND l.user_idx = ?`;
+  db.query(getSql, [fatigue_idx, user_idx], (err, rows) => {
+    if (err) return cb(err);
+    if (!rows.length) return cb(new Error('권한 없음 또는 데이터 없음'));
+    const { file_idx, lifelog_idx } = rows[0];
+    db.query('DELETE FROM tb_fatigue WHERE fatigue_idx = ?', [fatigue_idx], (err) => {
+      if (err) return cb(err);
+      db.query('DELETE FROM tb_darkcircle WHERE file_idx = ?', [file_idx], (err) => {
+        if (err) return cb(err);
+        db.query('DELETE FROM tb_lifelog WHERE lifelog_idx = ?', [lifelog_idx], (err) => {
+          if (err) return cb(err);
+          db.query('DELETE FROM tb_file WHERE file_idx = ?', [file_idx], (err) => {
+            cb(err || null);
+          });
+        });
+      });
+    });
+  });
+};
+
+module.exports = { insert, getLatestByUser, getWeeklyByUser, getCalendarByUser, getHistoryByUser, deleteWithCascade };

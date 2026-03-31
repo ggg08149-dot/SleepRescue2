@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getFatigueHistory, deleteFatigueRecord } from '../api/fatigueApi';
 
 const getFatigueMessage = (fatigue, userName, causeName) => {
   if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
@@ -18,10 +19,18 @@ const PLAN_DATA = [
   { n: 15, days: '15', label: '15일 플랜', desc: '만성 피로 탈출 프로젝트.\n다크서클 없는 맑은 아침을 약속합니다.' },
 ];
 
-const STORAGE_KEY = 'sleeprescue_analysis_history';
+// DB 레코드 → ResultCard props 변환
+const toResultProps = (row) => ({
+  fatigue      : row.fatigue_level,
+  fatigueCause : row.fatigue_reason,
+  fatigueDetails: (() => { try { return JSON.parse(row.analysis_result || '[]'); } catch { return []; } })(),
+  score        : row.fatigue_score,
+  savedAt      : row.created_at,
+  fatigue_idx  : row.fatigue_idx,
+});
 
 // ─── 결과 카드 (단일) ────────────────────────────
-export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching, onSave, saved }) {
+export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching }) {
   if (!result) return null;
   const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue) || FATIGUE_LEVELS[0];
   const causeName = result.fatigueCause === '모든 항목이 양호한 상태입니다.'
@@ -92,25 +101,6 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
         </div>
       </div>
 
-      {/* 저장하기 버튼 */}
-      {onSave && (
-        <button
-          onClick={onSave}
-          disabled={saved}
-          style={{
-            width: '100%', padding: '13px',
-            background: saved ? 'rgba(34,197,94,0.12)' : 'rgba(110,231,247,0.1)',
-            border: `1px solid ${saved ? 'rgba(34,197,94,0.4)' : 'rgba(110,231,247,0.3)'}`,
-            borderRadius: '12px', color: saved ? '#22c55e' : 'var(--accent)',
-            fontFamily: "'Noto Sans KR', sans-serif", fontSize: '14px', fontWeight: 700,
-            cursor: saved ? 'default' : 'pointer', marginBottom: '14px',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          {saved ? '✓ 저장 완료!' : '💾 분석 결과 저장하기'}
-        </button>
-      )}
-
       {/* 플랜 선택 */}
       <div className="section-title">추천 수면 코칭 플랜</div>
       <div className="plan-grid">
@@ -126,65 +116,71 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
         ))}
       </div>
       {selectedPlan && (
-        <button className="analyze-btn" onClick={onStartCoaching} style={{ background: 'var(--accent2)', marginTop: '4px' }}>
-          💬 {selectedPlan}일 플랜으로 코칭 시작하기 →
+        <button className="analyze-btn" onClick={onStartCoaching}
+          style={{ background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', marginTop: '8px' }}>
+          🚀 {selectedPlan}일 플랜 진행하기
         </button>
       )}
     </div>
   );
 }
 
-// ─── 분석 결과 탭 (저장 목록 포함) ──────────────
-function AnalysisResult({ currentResult, existingResult, userName, startCoaching, onSwitchToScan }) {
+const fatigueColor = (f) => f === 'high' ? '#ef4444' : f === 'mid' ? '#f59e0b' : '#22c55e';
+const fatigueLabel = (f) => f === 'high' ? '높음' : f === 'mid' ? '주의' : '낮음';
+const fatigueIcon  = (f) => f === 'high' ? '🔥' : f === 'mid' ? '⚠️' : '✅';
+
+// ─── 분석 결과 탭 (DB 히스토리 포함) ──────────────
+function AnalysisResult({ currentResult, existingResult, userName, userIdx, startCoaching, onSwitchToScan }) {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [history, setHistory]           = useState([]);
-  const [saved, setSaved]               = useState(false);
-  const [viewIdx, setViewIdx]           = useState(null); // null = 최신결과, number = 이전결과
+  const [expanded, setExpanded]         = useState(false);  // 펼쳐보기 상태
+  const [viewItem, setViewItem]         = useState(null);   // 상세보기 중인 DB 레코드
 
   const displayResult = currentResult || existingResult;
 
-  // 로컬스토리지에서 히스토리 불러오기
-  useEffect(() => {
+  // DB에서 히스토리 불러오기
+  const fetchHistory = async () => {
+    if (!userIdx) return;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setHistory(JSON.parse(raw));
-    } catch (e) {}
-  }, []);
-
-  // 저장하기
-  const handleSave = () => {
-    if (!displayResult) return;
-    const newItem = {
-      ...displayResult,
-      savedAt: new Date().toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-      id: Date.now(),
-    };
-    const newHistory = [newItem, ...history].slice(0, 20); // 최대 20개
-    setHistory(newHistory);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-    setSaved(true);
+      const res = await getFatigueHistory(userIdx);
+      if (res.success) setHistory(res.data || []);
+    } catch (e) {
+      console.error('히스토리 조회 실패:', e);
+    }
   };
 
-  const handleDelete = (id) => {
-    const newHistory = history.filter(h => h.id !== id);
-    setHistory(newHistory);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-    if (viewIdx !== null) setViewIdx(null);
+  useEffect(() => {
+    fetchHistory();
+  }, [currentResult, userIdx]);
+
+  // DB 삭제
+  const handleDelete = async (e, fatigue_idx) => {
+    e.stopPropagation();
+    if (!window.confirm('이 분석 결과를 삭제할까요?')) return;
+    try {
+      const res = await deleteFatigueRecord(fatigue_idx, userIdx);
+      if (res.success) {
+        setHistory(prev => prev.filter(h => h.fatigue_idx !== fatigue_idx));
+        if (viewItem?.fatigue_idx === fatigue_idx) setViewItem(null);
+      } else {
+        alert('삭제 실패: ' + (res.message || '오류'));
+      }
+    } catch (e) {
+      alert('삭제 중 오류가 발생했습니다.');
+    }
   };
 
-  const fatigueColor = (f) => f === 'high' ? '#ef4444' : f === 'mid' ? '#f59e0b' : '#22c55e';
-  const fatigueLabel = (f) => f === 'high' ? '높음' : f === 'mid' ? '주의' : '낮음';
-  const fatigueIcon  = (f) => f === 'high' ? '🔥' : f === 'mid' ? '⚠️' : '✅';
-
-  // 이전 결과 상세 보기
-  const selectedHistory = viewIdx !== null ? history[viewIdx] : null;
+  // 표시할 히스토리 목록 (최신 결과와 중복 제거: 현재 결과가 있으면 첫 번째 건너뜀)
+  const historyList = history;
+  const visibleCount = expanded ? historyList.length : 2;
+  const visibleHistory = historyList.slice(0, visibleCount);
 
   return (
     <div>
       {/* 이전 결과 상세 보기 모드 */}
-      {selectedHistory ? (
+      {viewItem ? (
         <>
-          <button onClick={() => setViewIdx(null)} style={{
+          <button onClick={() => setViewItem(null)} style={{
             background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)',
             padding: '6px 14px', borderRadius: '8px', cursor: 'pointer',
             fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px', marginBottom: '14px',
@@ -192,10 +188,10 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
             ← 목록으로
           </button>
           <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '10px' }}>
-            📅 {selectedHistory.savedAt} 저장된 결과
+            📅 {viewItem.savedAt} 분석 결과
           </div>
           <ResultCard
-            result={selectedHistory}
+            result={viewItem}
             userName={userName}
             selectedPlan={selectedPlan}
             onSelectPlan={setSelectedPlan}
@@ -212,8 +208,6 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
               selectedPlan={selectedPlan}
               onSelectPlan={setSelectedPlan}
               onStartCoaching={() => { if (selectedPlan) startCoaching(selectedPlan); }}
-              onSave={handleSave}
-              saved={saved}
             />
           ) : (
             <div style={{
@@ -232,57 +226,78 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
             </div>
           )}
 
-          {/* 이전 결과 목록 */}
-          {history.length > 0 && (
+          {/* 이전 분석 결과 목록 */}
+          {historyList.length > 0 && (
             <>
               <div className="section-title" style={{ marginTop: '8px' }}>이전 분석 결과</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {history.map((item, idx) => (
-                  <div key={item.id}
-                    style={{
-                      background: 'var(--bg2)', border: '1px solid var(--border)',
-                      borderRadius: '12px', padding: '14px 16px',
-                      display: 'flex', alignItems: 'center', gap: '12px',
-                      cursor: 'pointer', transition: 'all 0.2s',
-                    }}
-                    onClick={() => setViewIdx(idx)}
-                  >
-                    <div style={{ fontSize: '22px' }}>{fatigueIcon(item.fatigue)}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                        <span style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: '13px', fontWeight: 700, color: '#fff' }}>
-                          피로도
-                        </span>
-                        <span style={{
-                          fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700,
-                          color: fatigueColor(item.fatigue),
-                          background: `${fatigueColor(item.fatigue)}22`,
-                          border: `1px solid ${fatigueColor(item.fatigue)}66`,
-                        }}>
-                          {fatigueLabel(item.fatigue)}
-                        </span>
+                {visibleHistory.map((item) => {
+                  const props = toResultProps(item);
+                  return (
+                    <div key={item.fatigue_idx}
+                      style={{
+                        background: 'var(--bg2)', border: '1px solid var(--border)',
+                        borderRadius: '12px', padding: '14px 16px',
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        cursor: 'pointer', transition: 'all 0.2s',
+                      }}
+                      onClick={() => setViewItem(props)}
+                    >
+                      <div style={{ fontSize: '22px' }}>{fatigueIcon(item.fatigue_level)}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                          <span style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                            피로도
+                          </span>
+                          <span style={{
+                            fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700,
+                            color: fatigueColor(item.fatigue_level),
+                            background: `${fatigueColor(item.fatigue_level)}22`,
+                            border: `1px solid ${fatigueColor(item.fatigue_level)}66`,
+                          }}>
+                            {fatigueLabel(item.fatigue_level)}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                          📅 {item.created_at}
+                          {item.fatigue_reason && ` · ${item.fatigue_reason.slice(0, 15)}...`}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                        📅 {item.savedAt}
-                        {item.fatigueCause && ` · ${item.fatigueCause.slice(0, 15)}...`}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--muted)' }}>상세보기 ▶</span>
+                        <button
+                          onClick={(e) => handleDelete(e, item.fatigue_idx)}
+                          style={{
+                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                            color: '#f87171', borderRadius: '8px', padding: '4px 8px',
+                            cursor: 'pointer', fontSize: '11px', fontFamily: "'Noto Sans KR', sans-serif",
+                          }}
+                        >
+                          삭제
+                        </button>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--muted)' }}>상세보기 ▶</span>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleDelete(item.id); }}
-                        style={{
-                          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                          color: '#f87171', borderRadius: '8px', padding: '4px 8px',
-                          cursor: 'pointer', fontSize: '11px', fontFamily: "'Noto Sans KR', sans-serif",
-                        }}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* 펼쳐보기 / 접기 버튼 */}
+              {historyList.length > 2 && (
+                <button
+                  onClick={() => setExpanded(prev => !prev)}
+                  style={{
+                    width: '100%', marginTop: '8px', padding: '10px',
+                    background: 'var(--bg2)', border: '1px solid var(--border)',
+                    borderRadius: '10px', color: 'var(--muted)',
+                    fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {expanded
+                    ? `▲ 접기`
+                    : `▼ 펼쳐보기 (${historyList.length - 2}건 더보기)`}
+                </button>
+              )}
             </>
           )}
         </>
