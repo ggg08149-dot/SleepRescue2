@@ -1,12 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
+const AUTO_LOGIN_KEY = 'sleeprescue_auto_login';
+
 function Login({ goHome, goSignUp }) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
-  const { loading, loginUser } = useAuth();
+  const [showPw, setShowPw]     = useState(false);
+  const [error, setError]       = useState('');
+  const [autoLogin, setAutoLogin] = useState(false);
+  const { loading, loginUser }  = useAuth();
+
+  // 자동로그인 저장 정보 불러오기
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AUTO_LOGIN_KEY);
+      if (saved) {
+        const { email: savedEmail, password: savedPw } = JSON.parse(saved);
+        setEmail(savedEmail || '');
+        setPassword(savedPw || '');
+        setAutoLogin(true);
+      }
+    } catch (e) {}
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -23,6 +39,12 @@ function Login({ goHome, goSignUp }) {
 
     const data = await loginUser(email, password);
     if (data.success) {
+      // 자동로그인 체크 시 저장 / 해제 시 삭제
+      if (autoLogin) {
+        localStorage.setItem(AUTO_LOGIN_KEY, JSON.stringify({ email, password }));
+      } else {
+        localStorage.removeItem(AUTO_LOGIN_KEY);
+      }
       localStorage.setItem('token', data.token);
       sessionStorage.setItem('user_idx', data.user_idx);
       goHome(data.userName, data.userEmail, data.userId);
@@ -58,7 +80,7 @@ function Login({ goHome, goSignUp }) {
                 className="auth-input"
                 placeholder="example@email.com"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                onChange={e => { setEmail(e.target.value); setError(''); }}
                 autoComplete="email"
               />
             </div>
@@ -73,17 +95,41 @@ function Login({ goHome, goSignUp }) {
                 className="auth-input"
                 placeholder="비밀번호를 입력하세요"
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                onChange={e => { setPassword(e.target.value); setError(''); }}
                 autoComplete="current-password"
               />
-              <button
-                type="button"
-                className="auth-pw-toggle"
-                onClick={() => setShowPw(!showPw)}
-              >
+              <button type="button" className="auth-pw-toggle" onClick={() => setShowPw(!showPw)}>
                 {showPw ? '숨김' : '표시'}
               </button>
             </div>
+          </div>
+
+          {/* 자동로그인 체크박스 */}
+          <div
+            onClick={() => setAutoLogin(!autoLogin)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              cursor: 'pointer', marginTop: '2px', marginBottom: '4px',
+            }}
+          >
+            <div style={{
+              width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
+              border: `1.5px solid ${autoLogin ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+              background: autoLogin ? 'var(--accent)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '11px', color: '#0b0b13', fontWeight: 700,
+              transition: 'all 0.2s ease',
+            }}>
+              {autoLogin && '✓'}
+            </div>
+            <span style={{ fontSize: '13px', color: autoLogin ? 'var(--accent)' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}>
+              자동 로그인
+            </span>
+            {autoLogin && (
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>
+                정보가 저장됩니다
+              </span>
+            )}
           </div>
 
           {error && (
