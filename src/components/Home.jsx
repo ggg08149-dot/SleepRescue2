@@ -61,7 +61,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   const [latestLifelog, setLatestLifelog] = useState(null);
   const [calFatigue,    setCalFatigue]    = useState({});
 
-  const [streak, setStreak]               = useState(5);
+  const [streak, setStreak]               = useState(0);
   const [analysisCount, setAnalysisCount] = useState(0);
   const [missionChecks, setMissionChecks] = useState([false, false, false]);
   const [missionSaved, setMissionSaved]   = useState(false);
@@ -96,6 +96,26 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
         localStorage.getItem('sleeprescue_analysis_history') || '[]'
       );
       setAnalysisCount(history.length);
+    } catch (e) {}
+
+    // 연속 달성 streak 계산
+    try {
+      const missionHistory = JSON.parse(
+        localStorage.getItem('sleeprescue_mission_history') || '{}'
+      );
+      let count = 0;
+      const now = new Date();
+      for (let i = 0; i < 365; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (missionHistory[key]) {
+          count++;
+        } else {
+          break;
+        }
+      }
+      setStreak(count > 0 ? count : 0);
     } catch (e) {}
 
     // DB 데이터 fetch
@@ -168,7 +188,15 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
 
   const saveMissions = () => {
     setMissionSaved(true);
-    if (missionChecks.every(Boolean)) setStreak(prev => prev + 1);
+    if (missionChecks.every(Boolean)) {
+      // 오늘 날짜로 미션 완료 저장
+      const now = new Date();
+      const key = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      const history = JSON.parse(localStorage.getItem('sleeprescue_mission_history') || '{}');
+      history[key] = true;
+      localStorage.setItem('sleeprescue_mission_history', JSON.stringify(history));
+      setStreak(prev => prev + 1);
+    }
   };
 
   const completedCount = missionChecks.filter(Boolean).length;
