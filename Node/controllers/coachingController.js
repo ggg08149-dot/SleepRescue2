@@ -2,13 +2,19 @@ const coachingModel = require('../models/coachingModel');
 const axios = require('axios');
 
 const getGptCoaching = (req, res) => {
-  // 1. 유저 ID 확보 (토큰 없으면 기본값 1008 사용)
+  // 1. 유저 ID 확보 (우선순위: 리액트가 보낸 값 > 토큰에 있는 값 > 기본값 1008)
   let user_idx = 1008;
-  if (req && req.user && req.user.id) {
+
+  if (req.body && req.body.user_idx) {
+    // 리액트에서 JSON 본문에 실어 보낸 ID를 먼저 확인합니다.
+    user_idx = req.body.user_idx;
+  } else if (req.user && req.user.id) {
+    // 토큰 정보가 있다면 그 정보를 사용합니다.
     user_idx = req.user.id;
   }
 
-  console.log("🚀 분석 시작! 대상 유저 번호:", user_idx);
+  // 로그를 찍어서 1009가 제대로 나오는지 꼭 확인하세요!
+  console.log("🚀 [노드서버] 분석 시작! 최종 확정 유저 번호:", user_idx);
 
   // 2. DB 데이터 조회
   coachingModel.getLatestSleepData(user_idx, async (err, result) => {
@@ -18,12 +24,13 @@ const getGptCoaching = (req, res) => {
     }
 
     if (!result || result.length === 0) {
-      console.warn("⚠️ 유저 데이터 없음");
+      // 1009번 데이터가 DB에 없으면 여기가 실행됩니다.
+      console.warn(`⚠️ 유저(${user_idx}) 데이터 없음`);
       return res.status(404).json({ message: "분석할 데이터가 없습니다." });
     }
 
     const userData = result[0];
-    console.log("✅ DB 데이터 확보 성공");
+    console.log(`✅ 유저(${user_idx}) DB 데이터 확보 성공! (수면: ${userData.sleep_hours}h)`);
 
     try {
       // 3. FastAPI 서버로 데이터 전송
