@@ -16,8 +16,8 @@ app.add_middleware(
     allow_headers    = ["*"],
 )
 
-app.include_router(yolo_router)
-app.include_router(ml_router)
+
+
 app.include_router(yolo_router)
 app.include_router(ml_router)
 app.include_router(coaching_router) # 2. 이거 추가! (이제 주소 활성화됨)

@@ -39,10 +39,7 @@ async def gpt_coaching(data: AnalysisRequest):
         - 피로 원인: {data.fatigue_reason}
         """
     
-    # 3. llm_service의 함수 호출 (우리가 아까 성공한 그 코드!)
-    solutions = get_sleep_analysis(user_info_text)
-    
-    # 4. [GPT 호출] 완성된 텍스트를 서비스 레이어로 전달
+    # 3. [GPT 호출] 완성된 텍스트를 서비스 레이어로 전달
     try:
         solutions = get_sleep_analysis(user_info_text)
         return {"status": "success", "solutions": solutions}
