@@ -92,4 +92,4 @@ const applyOptimization = (req, res) => {
   });
 };
 
-module.exports = { getGptCoaching };
+module.exports = { getGptCoaching, applyOptimization };
