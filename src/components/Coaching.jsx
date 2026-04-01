@@ -95,6 +95,43 @@ const PLAN_INFO = {
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [activePlan, setActivePlan] = useState(initialPlan);
+  const [gptSolutions, setGptSolutions] = useState([]); // GPT 답변 저장
+  const [loadingGpt, setLoadingGpt] = useState(false);  // 로딩 표시용
+
+useEffect(() => {
+    const fetchGptCoaching = async () => {
+      setLoadingGpt(true);
+      try {
+        // 1. 브라우저 저장소에서 토큰이나 유저 ID가 있는지 다 뒤져봅니다.
+        const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+        const savedUserIdx = localStorage.getItem('coaching_user_id') || localStorage.getItem('userId') || localStorage.getItem('id') || 1008;
+
+        // 2. 서버에 보낼 데이터를 준비합니다.
+        // 토큰이 있으면 헤더에 넣고, 없으면 본문에 user_idx를 실어서 보냅니다.
+        const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
+          { 
+            // 헤더가 실패할 경우를 대비해 본문에도 user_idx를 같이 보냅니다.
+            user_idx: savedUserIdx || 1008 
+          }, 
+          {
+            headers: { 
+              'Authorization': token ? `Bearer ${token}` : '' 
+            }
+          }
+        );
+
+        if (response.data.solutions) {
+          setGptSolutions(response.data.solutions);
+        }
+      } catch (error) {
+        console.error("GPT 코칭 로드 실패:", error);
+      } finally {
+        setLoadingGpt(false);
+      }
+    };
+
+    fetchGptCoaching();
+  }, []);
   const [activeDay, setActiveDay]   = useState(1);
   const [checks, setChecks]         = useState({});
   const [playingIdx, setPlayingIdx] = useState(null);
@@ -170,8 +207,36 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const char = getCharacter();
 
+  
   return (
     <div className="coaching-screen">
+  {/* --- [AI 코칭 카드 추가] --- */}
+      <div className="section-title" style={{ color: '#6ee7f7', marginTop: '20px' }}>🤖 AI 맞춤 수면 솔루션</div>
+      <div className="coaching-card" style={{ 
+        border: '1px solid rgba(110,231,247,0.3)', 
+        background: 'rgba(110,231,247,0.05)',
+        marginBottom: '25px' 
+      }}>
+        {loadingGpt ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>AI가 수면 데이터를 분석 중입니다...</p>
+          </div>
+        ) : gptSolutions.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {gptSolutions.map((solution, index) => (
+              <div key={index} style={{ fontSize: '13px', color: '#fff', display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#6ee7f7' }}>•</span>
+                {solution}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: 'var(--muted)', fontSize: '12px', textAlign: 'center' }}>
+            데이터를 분석할 수 없습니다. 수면 기록을 먼저 등록해 주세요.
+          </p>
+        )}
+      </div>
+      {/* ------------------------- */}
 
       {/* 플랜 선택 */}
       <div className="section-title">수면 코칭 플랜 선택</div>

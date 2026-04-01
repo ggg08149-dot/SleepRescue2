@@ -47,6 +47,10 @@ function Login({ goHome, goSignUp }) {
       }
       localStorage.setItem('token', data.token);
       localStorage.setItem('user_idx', data.user_idx);
+
+      const idForCoaching = data.user_idx || data.id || 1008; 
+      localStorage.setItem('coaching_user_id', idForCoaching); // 이름을 유니크하게!
+
       goHome(data.userName, data.userEmail, data.userId);
     } else {
       setError(data.message || '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
