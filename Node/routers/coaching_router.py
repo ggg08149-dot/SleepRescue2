@@ -29,12 +29,15 @@ async def gpt_coaching(data: AnalysisRequest):
     # 2. 💡 여기서 노드가 DB에서 가져온 데이터를 '문장'으로 만듭니다.
     # 이 과정이 있어야 llm_service.py의 {user_data}에 정보가 꽉 차서 들어갑니다.
     user_info_text = f"""
-    이 사용자는 어제 {data.sleep_hours}시간 잤습니다. 
-    카페인은 {data.caffeine}mg 섭취했고, {data.work_hours}시간 동안 근무했습니다. 
-    스마트폰 사용은 {data.phone_hours}시간, 운동은 {data.exec_hours}시간 했습니다. 
-    YOLO 분석 결과 다크서클 상태는 '{data.analysis_result}'이며, 
-    사용자가 말한 피로 원인은 '{data.fatigue_reason}'입니다.
-    """
+        [현재 사용자의 실제 기록 데이터]
+        - 어제 실제 수면 시간: {data.sleep_hours}시간
+        - 카페인 섭취량: {data.caffeine}mg
+        - 총 근무 시간: {data.work_hours}시간
+        - 스마트폰 사용 시간: {data.phone_hours}시간
+        - 실제 운동(유산소/근력) 시간: {data.exec_hours}시간
+        - AI가 분석한 다크서클 상태: {data.analysis_result}
+        - 피로 원인: {data.fatigue_reason}
+        """
     
     # 3. llm_service의 함수 호출 (우리가 아까 성공한 그 코드!)
     solutions = get_sleep_analysis(user_info_text)

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // 1. useEffect 추가
+import axios from 'axios'; // 2. axios 추가
+
 
 const PLAN_MISSIONS = {
   1: [
@@ -93,6 +95,51 @@ const PLAN_INFO = {
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [activePlan, setActivePlan] = useState(initialPlan);
+  const [gptSolutions, setGptSolutions] = useState([]); // GPT 답변 저장
+  const [loadingGpt, setLoadingGpt] = useState(false);  // 로딩 표시용
+
+useEffect(() => {
+  const fetchGptCoaching = async () => {
+    setLoadingGpt(true);
+    try {
+      // 1. 저장소에서 값을 가져옵니다. (우선순위: 전용 ID > user_idx > userId > 1008)
+      // localStorage에서 가져온 값은 문자열일 수 있으므로 확실히 체크합니다.
+      const rawCoachingId = localStorage.getItem('coaching_user_id');
+      const rawUserIdx = localStorage.getItem('user_idx');
+      const rawUserId = localStorage.getItem('userId');
+
+      // 최종적으로 사용할 ID 결정 (값이 'null'이거나 비어있지 않은지 확인)
+      const finalIdx = rawCoachingId || rawUserIdx || rawUserId || "1008";
+
+      console.log("🚀 [프론트엔드] 서버로 보낼 ID 확인:", finalIdx);
+
+      const token = localStorage.getItem('token');
+
+      // 2. 서버 요청
+      const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
+        { 
+          user_idx: parseInt(finalIdx) // 숫자로 변환해서 보냄
+        }, 
+        {
+          headers: { 
+            'Authorization': token ? `Bearer ${token}` : '' 
+          }
+        }
+      );
+
+      if (response.data.solutions) {
+        setGptSolutions(response.data.solutions);
+      }
+    } catch (error) {
+      console.error("GPT 코칭 로드 실패:", error);
+    } finally {
+      setLoadingGpt(false);
+    }
+  };
+
+  fetchGptCoaching();
+}, []); // 페이지 로드 시 실행
+
   const [activeDay, setActiveDay]   = useState(1);
   const [checks, setChecks]         = useState({});
   const [playingIdx, setPlayingIdx] = useState(null);
@@ -168,8 +215,36 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const char = getCharacter();
 
+  
   return (
     <div className="coaching-screen">
+  {/* --- [AI 코칭 카드 추가] --- */}
+      <div className="section-title" style={{ color: '#6ee7f7', marginTop: '20px' }}>🤖 AI 맞춤 수면 솔루션</div>
+      <div className="coaching-card" style={{ 
+        border: '1px solid rgba(110,231,247,0.3)', 
+        background: 'rgba(110,231,247,0.05)',
+        marginBottom: '25px' 
+      }}>
+        {loadingGpt ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>AI가 수면 데이터를 분석 중입니다...</p>
+          </div>
+        ) : gptSolutions.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {gptSolutions.map((solution, index) => (
+              <div key={index} style={{ fontSize: '13px', color: '#fff', display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#6ee7f7' }}>•</span>
+                {solution}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: 'var(--muted)', fontSize: '12px', textAlign: 'center' }}>
+            데이터를 분석할 수 없습니다. 수면 기록을 먼저 등록해 주세요.
+          </p>
+        )}
+      </div>
+      {/* ------------------------- */}
 
       {/* 플랜 선택 */}
       <div className="section-title">수면 코칭 플랜 선택</div>
