@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'; // 1. useEffect 추가
-import axios from 'axios'; // 2. axios 추가
-
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const PLAN_MISSIONS = {
   1: [
@@ -73,77 +72,77 @@ const PLAN_MISSIONS = {
 };
 
 const WHITE_NOISE = [
-
-  { title: '빗소리',           artist: '자연 백색소음',  dur: '∞', icon: '🌧', url: '/sounds/rain.mp3' },
-  { title: '파도 소리',        artist: '해변 백색소음',  dur: '∞', icon: '🌊', url: '/sounds/wave.mp3' },
-  { title: '숲속 바람',        artist: '자연 백색소음',  dur: '∞', icon: '🌿', url: '/sounds/forest.mp3' },
+  { title: '빗소리', artist: '자연 백색소음', dur: '∞', icon: '🌧', url: '/sounds/rain.mp3' },
+  { title: '파도 소리', artist: '해변 백색소음', dur: '∞', icon: '🌊', url: '/sounds/wave.mp3' },
+  { title: '숲속 바람', artist: '자연 백색소음', dur: '∞', icon: '🌿', url: '/sounds/forest.mp3' },
   { title: 'Deep Sleep Waves', artist: 'Binaural Beats', dur: '∞', icon: '🎵', url: '/sounds/sleep.mp3' },
 ];
 
-
 const TYPE_COLOR = {
-  '필수': { bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.4)',   color: '#f87171' },
-  '권장': { bg: 'rgba(245,158,11,0.15)',  border: 'rgba(245,158,11,0.4)',  color: '#fbbf24' },
-  '선택': { bg: 'rgba(110,231,247,0.1)',  border: 'rgba(110,231,247,0.3)', color: '#6ee7f7' },
+  '필수': { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)', color: '#f87171' },
+  '권장': { bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.4)', color: '#fbbf24' },
+  '선택': { bg: 'rgba(110,231,247,0.1)', border: 'rgba(110,231,247,0.3)', color: '#6ee7f7' },
 };
 
 const PLAN_INFO = {
-  1:  { label: '1일',  desc: '안색 긴급 복구',       color: '#ef4444' },
-  7:  { label: '7일',  desc: '진짜 원인 탐색',       color: '#f59e0b' },
-  15: { label: '15일', desc: '만성 피로 탈출',        color: '#6ee7f7' },
+  1: { label: '1일', desc: '안색 긴급 복구', color: '#ef4444' },
+  7: { label: '7일', desc: '진짜 원인 탐색', color: '#f59e0b' },
+  15: { label: '15일', desc: '만성 피로 탈출', color: '#6ee7f7' },
 };
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [activePlan, setActivePlan] = useState(initialPlan);
-  const [gptSolutions, setGptSolutions] = useState([]); // GPT 답변 저장
-  const [loadingGpt, setLoadingGpt] = useState(false);  // 로딩 표시용
-
-useEffect(() => {
-  const fetchGptCoaching = async () => {
-    setLoadingGpt(true);
-    try {
-      // 1. 저장소에서 값을 가져옵니다. (우선순위: 전용 ID > user_idx > userId > 1008)
-      // localStorage에서 가져온 값은 문자열일 수 있으므로 확실히 체크합니다.
-      const rawCoachingId = localStorage.getItem('coaching_user_id');
-      const rawUserIdx = localStorage.getItem('user_idx');
-      const rawUserId = localStorage.getItem('userId');
-
-      // 최종적으로 사용할 ID 결정 (값이 'null'이거나 비어있지 않은지 확인)
-      const finalIdx = rawCoachingId || rawUserIdx || rawUserId || "1008";
-
-      console.log("🚀 [프론트엔드] 서버로 보낼 ID 확인:", finalIdx);
-
-      const token = localStorage.getItem('token');
-
-      // 2. 서버 요청
-      const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
-        { 
-          user_idx: parseInt(finalIdx) // 숫자로 변환해서 보냄
-        }, 
-        {
-          headers: { 
-            'Authorization': token ? `Bearer ${token}` : '' 
-          }
-        }
-      );
-
-      if (response.data.solutions) {
-        setGptSolutions(response.data.solutions);
-      }
-    } catch (error) {
-      console.error("GPT 코칭 로드 실패:", error);
-    } finally {
-      setLoadingGpt(false);
-    }
-  };
-
-  fetchGptCoaching();
-}, []); // 페이지 로드 시 실행
-
-  const [activeDay, setActiveDay]   = useState(1);
-  const [checks, setChecks]         = useState({});
+  const [gptSolutions, setGptSolutions] = useState([]);
+  const [gptAnalysis, setGptAnalysis] = useState("");
+  const [loadingGpt, setLoadingGpt] = useState(false);
+  const [activeDay, setActiveDay] = useState(1);
+  const [checks, setChecks] = useState({});
   const [playingIdx, setPlayingIdx] = useState(null);
   const audioRef = React.useRef(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchGptCoaching = async () => {
+      const cachedData = localStorage.getItem('last_gpt_coaching');
+      const analysisId = analysisResult ? JSON.stringify(analysisResult) : 'no_data';
+      
+      if (cachedData) {
+        const { id, solutions, analysis } = JSON.parse(cachedData);
+        if (id === analysisId) {
+          setGptSolutions(solutions || []);
+          setGptAnalysis(analysis || "");
+          return;
+        }
+      }
+
+      setLoadingGpt(true);
+      try {
+        const userIdx = localStorage.getItem('user_idx') || "1008";
+        const token = localStorage.getItem('token');
+        const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
+          { user_idx: parseInt(userIdx) }, 
+          { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
+        );
+
+        if (isMounted && response.data.success) {
+          const { solutions, comparison_analysis } = response.data;
+          setGptSolutions(solutions || []);
+          setGptAnalysis(comparison_analysis || "");
+          localStorage.setItem('last_gpt_coaching', JSON.stringify({
+            id: analysisId,
+            solutions,
+            analysis: comparison_analysis
+          }));
+        }
+      } catch (error) {
+        console.error("GPT 코칭 로드 실패:", error);
+      } finally {
+        if (isMounted) setLoadingGpt(false);
+      }
+    };
+    fetchGptCoaching();
+    return () => { isMounted = false; };
+  }, [analysisResult]);
 
   const handlePlay = (idx) => {
     if (playingIdx === idx) {
@@ -161,38 +160,27 @@ useEffect(() => {
   };
 
   const planDays = PLAN_MISSIONS[activePlan] || PLAN_MISSIONS[7];
-
-  const fatigue    = analysisResult?.fatigue    || 'high';
+  const fatigue = analysisResult?.fatigue || 'high';
   const darkCircle = analysisResult?.darkCircle || 72;
   const sleepScore = analysisResult?.sleepScore || 4.2;
-  const fatigueNum   = fatigue === 'high' ? 72 : fatigue === 'mid' ? 45 : 20;
+  const fatigueNum = fatigue === 'high' ? 72 : fatigue === 'mid' ? 45 : 20;
   const fatigueLabel = fatigue === 'high' ? '위험 단계' : fatigue === 'mid' ? '주의 단계' : '양호';
   const fatigueColor = fatigue === 'high' ? '#ef4444' : fatigue === 'mid' ? '#f59e0b' : '#22c55e';
 
   const currentDay = planDays.find(d => d.day === activeDay) || planDays[0];
-  const dayKey     = `plan${activePlan}_day${activeDay}`;
-  const dayChecks  = checks[dayKey] || {};
+  const dayKey = `plan${activePlan}_day${activeDay}`;
+  const dayChecks = checks[dayKey] || {};
 
   const totalMissions = currentDay.missions.length;
-  const doneMissions  = Object.values(dayChecks).filter(Boolean).length;
-  const progressPct   = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
+  const doneMissions = Object.values(dayChecks).filter(Boolean).length;
+  const progressPct = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
 
   const totalAll = planDays.reduce((s, d) => s + d.missions.length, 0);
-  const doneAll  = planDays.reduce((s, d) => {
+  const doneAll = planDays.reduce((s, d) => {
     const k = `plan${activePlan}_day${d.day}`;
     return s + Object.values(checks[k] || {}).filter(Boolean).length;
   }, 0);
   const planProgress = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
-
-  let streak = 0;
-  for (let i = 1; i <= planDays.length; i++) {
-    const k = `plan${activePlan}_day${i}`;
-    const dc = checks[k] || {};
-    const done = Object.values(dc).filter(Boolean).length;
-    const total = planDays.find(d => d.day === i)?.missions.length || 0;
-    if (done === total && total > 0) streak++;
-    else break;
-  }
 
   const toggleCheck = (missionId) => {
     setChecks(prev => ({
@@ -208,18 +196,33 @@ useEffect(() => {
 
   const getCharacter = () => {
     if (progressPct === 100) return { emoji: '🌟', msg: '오늘 완벽해요!' };
-    if (progressPct >= 60)   return { emoji: '😊', msg: '잘하고 있어요!' };
-    if (progressPct >= 30)   return { emoji: '😐', msg: '조금만 더!' };
+    if (progressPct >= 60) return { emoji: '😊', msg: '잘하고 있어요!' };
+    if (progressPct >= 30) return { emoji: '😐', msg: '조금만 더!' };
     return { emoji: '😴', msg: '시작해볼까요?' };
   };
 
   const char = getCharacter();
 
-  
   return (
     <div className="coaching-screen">
-  {/* --- [AI 코칭 카드 추가] --- */}
-      <div className="section-title" style={{ color: '#6ee7f7', marginTop: '20px' }}>🤖 AI 맞춤 수면 솔루션</div>
+      {/* AI 코칭 분석 요약 카드 */}
+      {gptAnalysis && (
+        <div className="coaching-card" style={{ 
+          border: '1px solid rgba(167,139,250,0.3)', 
+          background: 'rgba(167,139,250,0.05)',
+          marginBottom: '16px' 
+        }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>📢</span>
+            <p style={{ fontSize: '13px', color: '#e2e8f0', margin: 0, lineHeight: '1.5', wordBreak: 'keep-all' }}>
+              {gptAnalysis}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* AI 맞춤 솔루션 카드 */}
+      <div className="section-title" style={{ color: '#6ee7f7' }}>🤖 AI 맞춤 수면 솔루션</div>
       <div className="coaching-card" style={{ 
         border: '1px solid rgba(110,231,247,0.3)', 
         background: 'rgba(110,231,247,0.05)',
@@ -244,7 +247,6 @@ useEffect(() => {
           </p>
         )}
       </div>
-      {/* ------------------------- */}
 
       {/* 플랜 선택 */}
       <div className="section-title">수면 코칭 플랜 선택</div>
@@ -253,30 +255,14 @@ useEffect(() => {
           const info = PLAN_INFO[plan];
           const isActive = activePlan === plan;
           return (
-            <button
-              key={plan}
-              onClick={() => handlePlanChange(plan)}
-              style={{
-                flex: 1,
-                padding: '14px 10px',
-                borderRadius: '14px',
-                border: `1px solid ${isActive ? info.color : 'var(--border)'}`,
-                background: isActive ? `rgba(${plan === 1 ? '239,68,68' : plan === 7 ? '245,158,11' : '110,231,247'},0.1)` : 'var(--bg2)',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <div style={{
-                fontFamily: "'Bebas Neue',sans-serif",
-                fontSize: '28px',
-                color: isActive ? info.color : 'var(--muted)',
-                lineHeight: 1,
-                transition: 'color 0.2s ease',
-              }}>{info.label}</div>
-              <div style={{ fontSize: '10px', color: isActive ? info.color : 'var(--muted)', marginTop: '4px', transition: 'color 0.2s ease' }}>
-                {info.desc}
-              </div>
+            <button key={plan} onClick={() => handlePlanChange(plan)} style={{
+              flex: 1, padding: '14px 10px', borderRadius: '14px',
+              border: `1px solid ${isActive ? info.color : 'var(--border)'}`,
+              background: isActive ? `rgba(${plan === 1 ? '239,68,68' : plan === 7 ? '245,158,11' : '110,231,247'},0.1)` : 'var(--bg2)',
+              cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s ease',
+            }}>
+              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '28px', color: isActive ? info.color : 'var(--muted)', lineHeight: 1 }}>{info.label}</div>
+              <div style={{ fontSize: '10px', color: isActive ? info.color : 'var(--muted)', marginTop: '4px' }}>{info.desc}</div>
             </button>
           );
         })}
@@ -294,8 +280,8 @@ useEffect(() => {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {[
-            { l: '다크서클',          v: `${darkCircle}%`, c: fatigueColor },
-            { l: '수면점수',          v: `${sleepScore}`,  c: '#f59e0b' },
+            { l: '다크서클', v: `${darkCircle}%`, c: fatigueColor },
+            { l: '수면점수', v: `${sleepScore}`, c: '#f59e0b' },
             { l: `${activePlan}일 진행`, v: `${planProgress}%`, c: '#6ee7f7' },
           ].map(i => (
             <div key={i.l} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px 14px', flex: 1, textAlign: 'center' }}>
@@ -306,144 +292,34 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* 플랜 전체 진행률 */}
-      <div className="week-chart" style={{ padding: '14px', marginBottom: '14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <div>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '18px', letterSpacing: '1px' }}>
-              {activePlan}일 집중 케어 플랜
-            </div>
-            {streak > 0 && (
-              <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px' }}>
-                🔥 {streak}일 연속 달성!
-              </div>
-            )}
-          </div>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '24px', color: 'var(--accent)' }}>
-            {planProgress}%
-          </div>
-        </div>
-        <div style={{ height: '6px', background: 'rgba(255,255,255,0.07)', borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', width: `${planProgress}%`,
-            background: 'linear-gradient(90deg, var(--accent), #4dd8ee)',
-            borderRadius: '4px', transition: 'width 0.5s ease',
-          }} />
-        </div>
-
-        {/* 일차별 탭 */}
-        <div style={{ display: 'flex', gap: '6px', marginTop: '14px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {planDays.map(d => {
-            const k = `plan${activePlan}_day${d.day}`;
-            const dc = checks[k] || {};
-            const done = Object.values(dc).filter(Boolean).length;
-            const total = d.missions.length;
-            const allDone = done === total && total > 0;
-            const isActive = activeDay === d.day;
-            return (
-              <button
-                key={d.day}
-                onClick={() => setActiveDay(d.day)}
-                style={{
-                  flexShrink: 0,
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${isActive ? 'rgba(110,231,247,0.5)' : allDone ? 'rgba(34,197,94,0.4)' : 'var(--border)'}`,
-                  background: isActive ? 'rgba(110,231,247,0.12)' : allDone ? 'rgba(34,197,94,0.08)' : 'var(--bg3)',
-                  color: isActive ? 'var(--accent)' : allDone ? '#22c55e' : 'var(--muted)',
-                  fontFamily: "'Bebas Neue',sans-serif",
-                  fontSize: '13px', cursor: 'pointer', letterSpacing: '0.5px',
-                }}
-              >
-                {allDone ? '✓' : `DAY${d.day}`}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* 오늘 미션 */}
       <div className="section-title">DAY {activeDay} — {currentDay.title}</div>
       <div className="coaching-card">
-        {/* 캐릭터 + 진행률 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
-          <div style={{
-            width: '52px', height: '52px', borderRadius: '50%',
-            background: 'rgba(110,231,247,0.08)',
-            border: '1px solid rgba(110,231,247,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '26px', transition: 'all 0.3s ease',
-          }}>
-            {char.emoji}
-          </div>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(110,231,247,0.08)', border: '1px solid rgba(110,231,247,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>{char.emoji}</div>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
               <span>{char.msg}</span>
-              <span style={{ color: doneMissions === totalMissions ? '#22c55e' : 'var(--accent)' }}>
-                {doneMissions}/{totalMissions} 완료
-              </span>
+              <span style={{ color: doneMissions === totalMissions ? '#22c55e' : 'var(--accent)' }}>{doneMissions}/{totalMissions} 완료</span>
             </div>
             <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', width: `${progressPct}%`,
-                background: progressPct === 100 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,var(--accent),#4dd8ee)',
-                borderRadius: '4px', transition: 'width 0.4s ease',
-              }} />
+              <div style={{ height: '100%', width: `${progressPct}%`, background: progressPct === 100 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,var(--accent),#4dd8ee)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
             </div>
           </div>
         </div>
-
-        {/* 미션 체크리스트 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {currentDay.missions.map(mission => {
             const isChecked = dayChecks[mission.id] || false;
             const tc = TYPE_COLOR[mission.type];
             return (
-              <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '11px 12px',
-                background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`,
-                borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s ease',
-              }}>
-                <div style={{
-                  width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
-                  border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
-                  background: isChecked ? 'var(--accent)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', color: '#0b0b13', fontWeight: 700, transition: 'all 0.2s ease',
-                }}>
-                  {isChecked && '✓'}
-                </div>
-                <span style={{
-                  fontSize: '12px', flex: 1,
-                  textDecoration: isChecked ? 'line-through' : 'none',
-                  color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)',
-                  transition: 'all 0.2s ease',
-                }}>
-                  {mission.text}
-                </span>
-                <span style={{
-                  fontSize: '10px', padding: '2px 8px', borderRadius: '12px',
-                  background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color, flexShrink: 0,
-                }}>
-                  {mission.type}
-                </span>
+              <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
+                <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`, background: isChecked ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#0b0b13', fontWeight: 700 }}>{isChecked && '✓'}</div>
+                <span style={{ fontSize: '12px', flex: 1, textDecoration: isChecked ? 'line-through' : 'none', color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)' }}>{mission.text}</span>
+                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color }}>{mission.type}</span>
               </div>
             );
           })}
         </div>
-
-        {doneMissions === totalMissions && totalMissions > 0 && (
-          <div style={{
-            marginTop: '14px', padding: '12px',
-            background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
-            borderRadius: '10px', textAlign: 'center',
-            fontSize: '13px', color: '#4ade80', fontWeight: 700,
-          }}>
-            🎉 DAY {activeDay} 완료! 내일도 화이팅!
-          </div>
-        )}
       </div>
 
       {/* 백색소음 */}
@@ -462,21 +338,10 @@ useEffect(() => {
               <div style={{ fontSize: '13px', fontWeight: 500 }}>{m.title}</div>
               <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 300 }}>{m.artist}</div>
             </div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{m.dur}</div>
-            <div className="play-btn"
-              onClick={() => handlePlay(idx)}
-              style={{
-                background: playingIdx === idx ? 'rgba(110,231,247,0.2)' : 'rgba(110,231,247,0.1)',
-                border: playingIdx === idx ? '1px solid rgba(110,231,247,0.4)' : 'none',
-              }}
-            >
-              {playingIdx === idx ? '⏸' : '▶'}
-            </div>
+            <div className="play-btn" onClick={() => handlePlay(idx)} style={{ background: playingIdx === idx ? 'rgba(110,231,247,0.2)' : 'rgba(110,231,247,0.1)' }}>{playingIdx === idx ? '⏸' : '▶'}</div>
           </div>
         ))}
       </div>
-
-      <button className="confirm-btn">✓ 오늘 코칭 확인 완료</button>
     </div>
   );
 }

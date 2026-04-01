@@ -1,55 +1,35 @@
-const db = require('../config/db');
-
-// plan_type별 일별 할 일 목록
-const PLAN_TASKS = {
-  1: [
-    '오늘 밤 10시 이전 취침 / 카페인 섭취 중단 / 10분 명상으로 하루 마무리',
-  ],
-  7: [
-    '취침 시간 1시간 앞당기기',
-    '오후 2시 이후 카페인 섭취 금지',
-    '취침 전 스마트폰 30분 사용 금지',
-    '20분 가벼운 유산소 운동',
-    '취침 전 따뜻한 물로 족욕 또는 샤워',
-    '낮잠 20분 이내로 제한',
-    '수면 패턴 점검 및 7일 루틴 유지',
-  ],
-  15: [
-    '수면 시간 기록 시작',
-    '취침 시간 30분 앞당기기',
-    '카페인 섭취량 50% 줄이기',
-    '취침 전 스트레칭 10분',
-    '스마트폰 사용 시간 1시간 줄이기',
-    '오후 2시 이후 카페인 완전 금지',
-    '1주일 수면 패턴 점검',
-    '20분 유산소 운동 시작',
-    '취침 1시간 전 블루라이트 차단',
-    '규칙적인 기상 시간 설정',
-    '수면 환경 개선 (조명, 온도 조절)',
-    '명상 또는 호흡법 5분',
-    '야식 및 늦은 식사 금지',
-    '2주 수면 패턴 비교 분석',
-    '건강한 수면 루틴 완성 및 유지 계획 수립',
-  ],
+/**
+ * 특정 사용자의 현재 활성화된(가장 최근) 플랜 정보를 가져옵니다.
+ */
+const getActivePlan = (user_idx, cb) => {
+  const sql = `SELECT * FROM tb_plan WHERE user_idx = ? ORDER BY start_date DESC LIMIT 1`;
+  db.query(sql, [user_idx], cb);
 };
 
-// tb_plan INSERT → tb_plan_detail 다건 INSERT (트랜잭션)
-const insertPlan = (user_idx, plan_type, cb) => {
-  const tasks = PLAN_TASKS[plan_type];
-  if (!tasks) return cb(new Error('유효하지 않은 plan_type'));
+/**
+ * 특정 플랜의 특정 일차 미션들을 가져옵니다.
+ */
+const getDailyMissions = (plan_idx, day_number, cb) => {
+  const sql = `SELECT * FROM tb_plan_detail WHERE plan_idx = ? AND day_number = ?`;
+  db.query(sql, [plan_idx, day_number], cb);
+};
 
+/**
+ * [B안: 전체 재설정] 특정 일차의 모든 미션을 삭제하고 새로운 5개 미션으로 교체합니다.
+ */
+const resetDailyMissions = (plan_idx, user_idx, day_number, newTasks, cb) => {
   db.beginTransaction((err) => {
     if (err) return cb(err);
 
+    // 1. 기존 오늘 일차 미션 삭제
     db.query(
-      'INSERT INTO tb_plan (user_idx, plan_type, start_date) VALUES (?, ?, NOW())',
-      [user_idx, plan_type],
-      (err, result) => {
+      'DELETE FROM tb_plan_detail WHERE plan_idx = ? AND day_number = ?',
+      [plan_idx, day_number],
+      (err) => {
         if (err) return db.rollback(() => cb(err));
 
-        const plan_idx = result.insertId;
-        const detailRows = tasks.map((task, i) => [plan_idx, user_idx, i + 1, task]);
-
+        // 2. 새로운 5개 미션 삽입
+        const detailRows = newTasks.map((task) => [plan_idx, user_idx, day_number, task]);
         db.query(
           'INSERT INTO tb_plan_detail (plan_idx, user_idx, day_number, plan_task) VALUES ?',
           [detailRows],
@@ -58,7 +38,7 @@ const insertPlan = (user_idx, plan_type, cb) => {
 
             db.commit((err) => {
               if (err) return db.rollback(() => cb(err));
-              cb(null, plan_idx);
+              cb(null);
             });
           }
         );
@@ -67,4 +47,12 @@ const insertPlan = (user_idx, plan_type, cb) => {
   });
 };
 
-module.exports = { insertPlan, PLAN_TASKS };
+/**
+ * [A안: 부분 최적화] 완료되지 않은 미션만 선별적으로 교체합니다.
+ */
+const updateIncompleteMissions = (plan_idx, day_number, newTasks, cb) => {
+  // 로직: 미완료 미션 삭제 후 부족한 만큼 삽입 (복잡하므로 우선 단순 삭제/교체 구조 권장)
+  // ... 생략 (B안 우선 구현 후 필요시 확장)
+};
+
+module.exports = { getActivePlan, getDailyMissions, resetDailyMissions, updateIncompleteMissions };

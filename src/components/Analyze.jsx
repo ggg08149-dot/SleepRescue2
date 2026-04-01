@@ -40,24 +40,41 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   const handleScan = () => doScan(webcamRef);
 
   const handleAnalyze = () => {
-    // 1. doAnalyze 실행 (콜백 함수 앞에 async를 붙여야 await 사용 가능!)
     doAnalyze(lifestyleData, getTotalCaffeineMg, async (res) => {
       updateResult(res);
-      setViewTab('result'); // 분석 완료 시 결과 탭으로 자동 전환
+      setViewTab('result');
 
-      // 🚀 [추가] 분석 결과가 나오자마자 노드 서버의 GPT 코칭 호출!
+      // 🚀 [재측정 결과 기반 플랜 최적화 로직]
       try {
-        console.log("GPT 코칭을 요청합니다...");
-        const gptRes = await axios.post('http://localhost:7000/api/coaching/analyze', {
-          user_idx: userIdx, 
-        });
-        console.log("GPT 답변 수신 성공:", gptRes.data.solutions);
-        // 여기서 setGptSolutions(gptRes.data.solutions) 같은 걸로 저장하면 베스트!
+        const token = localStorage.getItem('token');
+        const gptRes = await axios.post('http://localhost:7000/api/coaching/analyze', 
+          { user_idx: userIdx },
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        const { is_critical, delta_score, solutions } = gptRes.data;
+
+        // 사용자 지시 문구 적용: "재측정 결과로 현재 플랜의 미션을 최적화 할까요?"
+        if (is_critical) {
+          const confirmOptimization = window.confirm(
+            `⚠️ 상태 변화 감지 (차이: ${delta_score}점)\n\n재측정 결과로 현재 플랜의 미션을 최적화 할까요?\n\n[확인]을 누르시면 오늘 남은 미션이 현재 상태에 맞춰 재설정됩니다.`
+          );
+
+          if (confirmOptimization) {
+            await axios.post('http://localhost:7000/api/coaching/apply-optimization',
+              { user_idx: userIdx, solutions: solutions },
+              { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            alert("✅ 오늘의 미션이 최적화되었습니다. 코칭 탭에서 확인하세요!");
+            localStorage.removeItem('last_gpt_coaching'); // 캐시 초기화하여 즉시 반영
+          }
+        }
       } catch (err) {
-        console.error("GPT 코칭 호출 실패:", err);
+        console.error("GPT 코칭 분석/최적화 실패:", err);
       }
-    }); // <--- doAnalyze를 닫는 괄호
-  }; // <--- handleAnalyze 전체를 닫는 괄호
+    });
+  };
+
 
   // ─── 음료 관련 ────────────────────────────────
   const addDrink = (drinkName) => {

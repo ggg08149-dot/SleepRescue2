@@ -9,57 +9,58 @@ from typing import List
 load_dotenv()
 
 class SleepSolution(BaseModel):
-    solutions: List[str] = Field(description="5가지 수면 개선 솔루션 리스트")
+    analysis: str = Field(description="어제와 오늘 데이터 비교 분석 내용 (개선된 점이나 주의점)")
+    tasks: List[str] = Field(description="오늘 실천해야 할 구체적인 5가지 미션 리스트")
 
-def get_sleep_analysis(user_info, plan_days=7):
-    llm    = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
+def get_sleep_analysis(data_payload):
+    """
+    오늘과 어제의 구조화된 데이터를 받아 비교 분석과 맞춤 코칭을 생성합니다.
+    """
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
     parser = JsonOutputParser(pydantic_object=SleepSolution)
 
-    prompt = ChatPromptTemplate.from_template(
-        """
-        당신은 수면 과학 전문가이자 라이프 코치입니다.
+    today = data_payload.get("today", {})
+    yesterday = data_payload.get("yesterday")
 
-        아래는 이 사용자의 실제 측정 데이터입니다:
-        {user_data}
+    prompt_text = """
+    당신은 수면 과학 전문가이자 라이프 코치입니다.
+    사용자의 오늘 데이터({today})와 어제 데이터({yesterday})를 비교하여 수면 개선 분석과 오늘의 미션을 생성해주세요.
 
-        위 데이터를 분석하여 이 사용자에게 딱 맞는 수면 개선 솔루션 5가지를 제안해주세요.
+    [분석 및 미션 생성 규칙]
+    1. 어제 데이터({yesterday})가 있다면 반드시 오늘 데이터와 비교하세요. 
+       예: "어제보다 카페인을 100mg 덜 마셨네요!", "어제보다 수면 시간이 1시간 줄어 아쉽습니다." 등.
+    2. 어제 데이터가 없다면(신규 유저), 오늘 데이터를 기준으로 첫 가이드를 정중하게 제공하세요.
+    3. 구체적인 수치(카페인 {t_caffeine}mg, 수면 {t_sleep}시간 등)를 직접 언급하여 설득력을 높이세요.
+    4. 오늘의 미션 5가지는 전문적이고 구체적이어야 합니다:
+       - 멜라토닌 영양제, 온열 스팀 안대, 타트체리 주스, 4-7-8 호흡법, 필라테스/러닝 등 구체적 행동 포함.
+    5. 사용자의 피로 원인({t_reason})을 분석에 반영하세요.
 
-        [규칙]
-        1. 반드시 위 사용자의 실제 수치를 언급하며 맞춤형으로 작성하세요.
-           예) "카페인을 {{caffeine}}mg 섭취했으니 오후 2시 이후 카페인을 끊으세요" 처럼 수치 언급
-        2. 구체적인 행동과 제품을 포함하세요 (온열 스팀 안대, 타트체리 주스, 암막 커튼 등)
-        3. 각 솔루션은 1-2문장으로 간결하게 작성하세요.
-        4. 절대 예시를 그대로 복사하지 마세요. 이 사용자 데이터 기반으로만 작성하세요.
+    {format_instructions}
+    """
 
-        {format_instructions}
-        """
-    )
-
+    prompt = ChatPromptTemplate.from_template(prompt_text)
     chain = prompt | llm | parser
 
     try:
         result = chain.invoke({
-            "user_data"           : user_info,
-           
-            "format_instructions" : parser.get_format_instructions()
+            "today": today,
+            "yesterday": yesterday if yesterday else "기록 없음(신규 가입자)",
+            "t_caffeine": today.get("caffeine", 0),
+            "t_sleep": today.get("sleep_hours", 0),
+            "t_reason": today.get("fatigue_reason", "알 수 없음"),
+            "format_instructions": parser.get_format_instructions()
         })
-
-        if isinstance(result, dict) and 'solutions' in result:
-            return result['solutions']
-        elif isinstance(result, list):
-            return result
-        else:
-            return list(result.values())[0] if result else []
-
+        
+        return {
+            "analysis": result.get("analysis", ""),
+            "solutions": result.get("tasks", [])
+        }
     except Exception as e:
         print(f"❌ LLM 오류: {e}")
-        return [
-            "충분한 휴식을 취하세요.",
-            "규칙적인 수면을 하세요.",
-            "카페인을 줄이세요.",
-            "스마트폰을 멀리하세요.",
-            "따뜻한 물로 샤워하세요."
-        ]
+        return {
+            "analysis": "데이터 분석 중 오류가 발생했습니다.",
+            "solutions": ["충분한 휴식을 취하세요.", "카페인을 줄이세요.", "스마트폰을 멀리하세요.", "규칙적인 수면을 하세요.", "따뜻한 물로 샤워하세요."]
+        }
 
 if __name__ == "__main__":
     sample_data = "수면시간 4시간, 카페인 280mg, 어제 운동 안함, 스마트폰 6시간, 근무 9시간"
