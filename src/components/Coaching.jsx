@@ -99,39 +99,47 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [loadingGpt, setLoadingGpt] = useState(false);  // 로딩 표시용
 
 useEffect(() => {
-    const fetchGptCoaching = async () => {
-      setLoadingGpt(true);
-      try {
-        // 1. 브라우저 저장소에서 토큰이나 유저 ID가 있는지 다 뒤져봅니다.
-        const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
-        const savedUserIdx = localStorage.getItem('coaching_user_id') || localStorage.getItem('userId') || localStorage.getItem('id') || 1008;
+  const fetchGptCoaching = async () => {
+    setLoadingGpt(true);
+    try {
+      // 1. 저장소에서 값을 가져옵니다. (우선순위: 전용 ID > user_idx > userId > 1008)
+      // localStorage에서 가져온 값은 문자열일 수 있으므로 확실히 체크합니다.
+      const rawCoachingId = localStorage.getItem('coaching_user_id');
+      const rawUserIdx = localStorage.getItem('user_idx');
+      const rawUserId = localStorage.getItem('userId');
 
-        // 2. 서버에 보낼 데이터를 준비합니다.
-        // 토큰이 있으면 헤더에 넣고, 없으면 본문에 user_idx를 실어서 보냅니다.
-        const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
-          { 
-            // 헤더가 실패할 경우를 대비해 본문에도 user_idx를 같이 보냅니다.
-            user_idx: savedUserIdx || 1008 
-          }, 
-          {
-            headers: { 
-              'Authorization': token ? `Bearer ${token}` : '' 
-            }
+      // 최종적으로 사용할 ID 결정 (값이 'null'이거나 비어있지 않은지 확인)
+      const finalIdx = rawCoachingId || rawUserIdx || rawUserId || "1008";
+
+      console.log("🚀 [프론트엔드] 서버로 보낼 ID 확인:", finalIdx);
+
+      const token = localStorage.getItem('token');
+
+      // 2. 서버 요청
+      const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
+        { 
+          user_idx: parseInt(finalIdx) // 숫자로 변환해서 보냄
+        }, 
+        {
+          headers: { 
+            'Authorization': token ? `Bearer ${token}` : '' 
           }
-        );
-
-        if (response.data.solutions) {
-          setGptSolutions(response.data.solutions);
         }
-      } catch (error) {
-        console.error("GPT 코칭 로드 실패:", error);
-      } finally {
-        setLoadingGpt(false);
-      }
-    };
+      );
 
-    fetchGptCoaching();
-  }, []);
+      if (response.data.solutions) {
+        setGptSolutions(response.data.solutions);
+      }
+    } catch (error) {
+      console.error("GPT 코칭 로드 실패:", error);
+    } finally {
+      setLoadingGpt(false);
+    }
+  };
+
+  fetchGptCoaching();
+}, []); // 페이지 로드 시 실행
+
   const [activeDay, setActiveDay]   = useState(1);
   const [checks, setChecks]         = useState({});
   const [playingIdx, setPlayingIdx] = useState(null);
