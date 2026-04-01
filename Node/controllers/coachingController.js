@@ -1,50 +1,48 @@
-const coachingModel = require('../models/coachingModel');
+const db = require('../config/db'); // [추가] DB 연결 설정 (안전장치)
+const coachingModel = require('../models/coachingModel'); 
 const axios = require('axios');
 
 const getGptCoaching = (req, res) => {
-
-const user_idx = req.session.user ? req.session.user.user_idx : 1; // 테스트용으로 1번 고정 가능
-  console.log("1. 분석 시작! 대상 유저:", user_idx);
-
-  const sql = "SELECT * FROM tb_lifelog WHERE user_idx = ? ORDER BY created_at DESC LIMIT 1";
+  // verifyToken 미들웨어가 토큰을 해석해 req.user.id에 넣어준 값을 가져옵니다.
+  const user_idx = (req.user && req.user.id) ? req.user.id : 1008; 
   
-  db.query(sql, [user_idx], async (err, result) => {
+  console.log("🚀 [서버] 분석 시작! 대상 유저 번호:", user_idx);
+
+  // 1. DB에서 데이터 가져오기
+  coachingModel.getLatestSleepData(user_idx, async (err, result) => {
     if (err) {
-      console.error("2. DB 에러 발생:", err);
-      return res.status(500).send("DB 오류");
+      console.error("❌ DB 에러:", err);
+      return res.status(500).json({ message: "DB 조회 중 오류 발생" });
     }
 
-    if (result.length === 0) {
-      console.warn("⚠️ 2. 데이터가 없습니다! DB에 먼저 값을 입력했는지 확인하세요.");
-      return res.status(404).json({ message: "분석할 데이터가 부족합니다." });
+    if (!result || result.length === 0) {
+      console.warn(`⚠️ 유저 ${user_idx}의 데이터가 DB에 없습니다.`);
+      return res.status(404).json({ message: "분석할 데이터(수면/다크서클)가 없습니다. 먼저 등록해주세요." });
     }
 
     const userData = result[0];
-    console.log("3. DB 데이터 확보 성공!:", userData);
 
     try {
-      console.log("4. 파이썬 서버로 출발합니다...");
+      // 2. FastAPI(파이썬) 서버로 데이터 전송
       const pythonResponse = await axios.post('http://localhost:8000/coaching', {
         user_idx: user_idx,
-        sleep_hours: userData.sleep_hours || 0, // DB 컬럼명 확인!
+        sleep_hours: userData.sleep_hours || 0,
         caffeine: userData.caffeine || 0,
-        work_hours: userData.work_hours || 0,   // 파이썬 Pydantic 모델과 이름 맞추기
+        work_hours: userData.work_hours || 0,
         phone_hours: userData.phone_hours || 0,
         exec_hours: userData.exec_hours || 0,
-        fatigue_reason: userData.fatigue_reason || "",
-        analysis_result: userData.analysis_result || ""
+        fatigue_reason: userData.fatigue_reason || "사유 없음",
+        analysis_result: userData.analysis_result || "결과 없음"
       });
 
-      // 4. GPT가 준 솔루션 5개를 리액트로 최종 반환!
-      const gptSolutions = pythonResponse.data.solutions;
-      
+      // 3. 결과 반환
       return res.status(200).json({
         message: "GPT 코칭 완료!",
-        solutions: gptSolutions
+        solutions: pythonResponse.data.solutions
       });
 
     } catch (error) {
-      console.error("파이썬 서버 통신 에러:", error);
+      console.error("❌ AI 서버 통신 에러:", error.message);
       return res.status(500).json({ message: "AI 분석 서버 연결 실패" });
     }
   });

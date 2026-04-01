@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // 1. useEffect 추가
+import axios from 'axios'; // 2. axios 추가
+
 
 const PLAN_MISSIONS = {
   1: [
