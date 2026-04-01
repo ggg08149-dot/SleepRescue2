@@ -16,7 +16,6 @@ const DEFAULT_MISSIONS = [
 
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 
-// 라이프로그 → LIFESTYLE FACTORS 표시 데이터 계산
 const buildLifestyleItems = (log) => {
   if (!log) return null;
   const { exec_hours, phone_hours, work_hours, caffeine, sleep_hours } = log;
@@ -62,13 +61,14 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   const [latestLifelog, setLatestLifelog] = useState(null);
   const [calFatigue,    setCalFatigue]    = useState({});
 
-  const [streak, setStreak] = useState(5);
+  const [streak, setStreak]               = useState(5);
+  const [analysisCount, setAnalysisCount] = useState(0);
   const [missionChecks, setMissionChecks] = useState([false, false, false]);
-  const [missionSaved, setMissionSaved] = useState(false);
+  const [missionSaved, setMissionSaved]   = useState(false);
 
   const today = new Date();
-  const [calYear, setCalYear]     = useState(today.getFullYear());
-  const [calMonth, setCalMonth]   = useState(today.getMonth());
+  const [calYear, setCalYear]       = useState(today.getFullYear());
+  const [calMonth, setCalMonth]     = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(null);
 
   const firstDay    = new Date(calYear, calMonth, 1).getDay();
@@ -85,10 +85,20 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     else setCalMonth(m => m + 1);
   };
 
-  // DB 데이터 fetch (최신 분석 완료 시 갱신)
+  // DB 데이터 fetch + 분석 횟수 카운팅
   useEffect(() => {
     const user_idx = localStorage.getItem('user_idx');
     if (!user_idx) return;
+
+    // localStorage에서 분석 횟수 읽기
+    try {
+      const history = JSON.parse(
+        localStorage.getItem('sleeprescue_analysis_history') || '[]'
+      );
+      setAnalysisCount(history.length);
+    } catch (e) {}
+
+    // DB 데이터 fetch
     getLatestFatigue(user_idx)
       .then(res => { if (res.success && res.data) setLatestFatigue(res.data); })
       .catch(() => {});
@@ -100,7 +110,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       .catch(() => {});
   }, [analysisResult]);
 
-  // 캘린더 fetch (월 이동 or 재분석 시 갱신)
+  // 캘린더 fetch
   useEffect(() => {
     const user_idx = localStorage.getItem('user_idx');
     if (!user_idx) return;
@@ -162,19 +172,18 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   };
 
   const completedCount = missionChecks.filter(Boolean).length;
-  // 오늘 포함 7일 슬롯 생성 (날짜 문자열 "YYYY-MM-DD")
+
   const buildDateStr = (daysAgo) => {
     const d = new Date();
     d.setDate(d.getDate() - daysAgo);
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
-  const sevenDaySlots = Array.from({ length: 7 }, (_, i) => buildDateStr(6 - i)); // [6일전..오늘]
+  const sevenDaySlots = Array.from({ length: 7 }, (_, i) => buildDateStr(6 - i));
   const weeklyMap = {};
   weeklyFatigue.forEach(w => { if (w.log_date) weeklyMap[w.log_date] = w; });
   const sevenDayData = sevenDaySlots.map(date => weeklyMap[date] || null);
   const dayLabels = ['7일전','6일전','5일전','4일전','3일전','어제','오늘'];
   const maxW = Math.max(...sevenDayData.filter(Boolean).map(w => w.fatigue_score), 1);
-  const days = ['월','화','수','목','금','토','일'];
   const calDays = ['일','월','화','수','목','금','토'];
 
   return (
@@ -242,8 +251,13 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
                 }}>{streak}</span>
                 <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>일 연속 달성</span>
               </div>
+              {/* 스트릭 메시지 */}
               <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>
                 {streak >= 7 ? '🏆 일주일 달성!' : streak >= 3 ? '💪 계속 가즈아!' : '🌱 시작이 반이에요!'}
+              </div>
+              {/* 분석 횟수 카운팅 */}
+              <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '4px' }}>
+                📊 총 분석 {analysisCount}회
               </div>
             </div>
           </div>
@@ -321,8 +335,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       {/* 주간 피로지수 */}
       <div className="section-title">주간 피로지수</div>
       <div className="charts-grid">
-
-        {/* 최근 피로도 - DB 최신값 */}
         <div className="stat-card">
           <div className="stat-label">최근 피로도</div>
           {latestFatigue ? (
@@ -343,7 +355,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
           )}
         </div>
 
-        {/* 주간 피로 추이 - 7일 슬롯, 측정 없는 날 공백 */}
         <div className="stat-card">
           <div className="stat-label">주간 피로 추이</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '60px', marginTop: '8px' }}>
@@ -373,7 +384,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
             {dayLabels.map(label => <span key={label}>{label}</span>)}
           </div>
         </div>
-
       </div>
 
       {/* 라이프스타일 요인 */}
@@ -446,40 +456,25 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
               : 'rgba(255,255,255,0.2)';
 
             return (
-              <div
-                key={d}
+              <div key={d}
                 onClick={() => setSelectedDate({ year: calYear, month: calMonth, day: d })}
                 style={{
                   borderRadius: '6px',
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
                   padding: '3px 0', cursor: 'pointer',
-                  border: isSelected
-                    ? '1px solid var(--accent)'
-                    : isToday
-                    ? '1px solid #6ee7f7'
-                    : '1px solid transparent',
-                  background: isSelected
-                    ? 'rgba(110,231,247,0.12)'
-                    : (score !== null || isToday)
-                    ? 'rgba(255,255,255,0.02)'
-                    : 'transparent',
+                  border: isSelected ? '1px solid var(--accent)' : isToday ? '1px solid #6ee7f7' : '1px solid transparent',
+                  background: isSelected ? 'rgba(110,231,247,0.12)' : (score !== null || isToday) ? 'rgba(255,255,255,0.02)' : 'transparent',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div style={{
-                  fontSize: '8px',
-                  color: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.3)',
-                  lineHeight: 1,
-                }}>{d}</div>
+                <div style={{ fontSize: '8px', color: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.3)', lineHeight: 1 }}>{d}</div>
                 <div style={{
                   width: '18px', height: '18px', borderRadius: '50%',
                   background: isSelected ? 'rgba(110,231,247,0.3)' : dotColor,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '7px',
-                  color: isSelected ? '#6ee7f7' : dotTextColor,
-                  marginTop: '2px',
-                  transition: 'all 0.15s ease',
+                  fontSize: '7px', color: isSelected ? '#6ee7f7' : dotTextColor,
+                  marginTop: '2px', transition: 'all 0.15s ease',
                 }}>
                   {isToday ? '오' : score !== null ? score : '-'}
                 </div>
@@ -488,7 +483,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
           })}
         </div>
 
-        {/* 선택된 날짜 정보 */}
         {selectedDate && (
           <div style={{
             marginTop: '12px', padding: '10px 14px',
@@ -510,21 +504,15 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
                 </span>
               </div>
             ) : (
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-                기록 없음
-              </div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>기록 없음</div>
             )}
-            <button
-              onClick={() => setSelectedDate(null)}
-              style={{
-                marginLeft: 'auto', background: 'none', border: 'none',
-                color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '14px',
-              }}
-            >✕</button>
+            <button onClick={() => setSelectedDate(null)} style={{
+              marginLeft: 'auto', background: 'none', border: 'none',
+              color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '14px',
+            }}>✕</button>
           </div>
         )}
 
-        {/* 범례 */}
         <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'center' }}>
           {[
             { color: 'rgba(34,197,94,0.3)',  text: '양호', textColor: '#22c55e' },
