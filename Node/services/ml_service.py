@@ -3,15 +3,26 @@ import pandas as pd
 from models_loader.loader import ml_model
 
 SLEEP_TARGET_HOURS = 7.5
-SIGMA_UNDER        = 3.8
-SIGMA_OVER         = 5.0
+SIGMA_HIGH = 3.0     # 5~7.5시간
+SIGMA_LOW = 1.15     # 2~5시간
+SIGMA_EXCESS = 5.0   # 7.5시간 초과
+MID_POINT = 5.0
 
 
 def _get_asymmetric_sleep_score(predicted_hours: float) -> float:
-    """가우시안 비대칭 수면 점수 (0~100)"""
-    sigma = SIGMA_UNDER if predicted_hours <= SLEEP_TARGET_HOURS else SIGMA_OVER
-    score = 100 * math.exp(-((predicted_hours - SLEEP_TARGET_HOURS) ** 2) / (2 * sigma ** 2))
-    return round(score, 1)
+    """3구간 비대칭 가우시안 수면 점수 (0~100)"""
+    target = SLEEP_TARGET_HOURS
+    mid_point = MID_POINT
+    
+    if predicted_hours > target:
+        score = 100 * math.exp(-((predicted_hours - target) ** 2) / (2 * SIGMA_EXCESS ** 2))
+    elif predicted_hours >= mid_point:
+        score = 100 * math.exp(-((predicted_hours - target) ** 2) / (2 * SIGMA_HIGH ** 2))
+    else:
+        score_at_5 = 100 * math.exp(-((mid_point - target) ** 2) / (2 * SIGMA_HIGH ** 2))
+        score = score_at_5 * math.exp(-((predicted_hours - mid_point) ** 2) / (2 * SIGMA_LOW ** 2))
+    
+    return round(max(0, score), 1)
 
 
 def _analyze_fatigue_cause_with_weight(workout: float, phone: float, work_hours: float, caffeine: float) -> str:
