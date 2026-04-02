@@ -14,8 +14,10 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # 1. 상수 정의
 # =====================================================
 SLEEP_TARGET_HOURS = 7.5
-SIGMA_UNDER = 2.5
-SIGMA_OVER = 5.0
+SIGMA_HIGH = 3.0     # 5~7.5시간 (급격한 감소)
+SIGMA_LOW = 1.15     # 2~5시간 (매우 급격한 감소)
+SIGMA_EXCESS = 5.0   # 7.5시간 초과 (매우 완만)
+MID_POINT = 5.0      # 5시간 기준점
 
 CAFFEINE_MAP = {
     '아메리카노': 120,
@@ -61,8 +63,8 @@ def get_asymmetric_sleep_score(predicted_hours):
     mid_point = 5.0  # 5시간 기준점
     
     # 구간별 sigma 값 (아까 코드에서 가져옴)
-    sigma_high = 2.0   # 5~7.5시간 (급격한 감소)
-    sigma_low = 1.5   # 2~5시간 (애무 급격한 감소)
+    sigma_high = 3.0   # 5~7.5시간 (급격한 감소)
+    sigma_low = 1.15   # 2~5시간 (애무 급격한 감소)
     sigma_excess = 5.0 # 7.5시간 초과 (매우 완만)
     
     # 1. 7.5시간 초과
