@@ -72,10 +72,12 @@ const PLAN_MISSIONS = {
 
 // 백색소음 데이터
 const WHITE_NOISE = [
-  { id: 0, title: '빗소리',          artist: '자연 백색소음',  icon: '🌧', url: '/sounds/rain.mp3',   tags: ['스트레스', '불면증', '집중력'] },
-  { id: 1, title: '파도 소리',       artist: '해변 백색소음',  icon: '🌊', url: '/sounds/wave.mp3',   tags: ['피로회복', '긴장완화', '명상'] },
-  { id: 2, title: '숲속 바람',       artist: '자연 백색소음',  icon: '🌿', url: '/sounds/forest.mp3', tags: ['수면유도', '자연치유', '안정'] },
-  { id: 3, title: 'Deep Sleep Waves', artist: 'Binaural Beats', icon: '🎵', url: '/sounds/sleep.mp3',  tags: ['깊은수면', '뇌파조절', '다크서클'] },
+  { id: 0, title: '빗소리',          artist: '자연 백색소음',  icon: '🌧', url: '/sounds/rain.mp3',    tags: ['스트레스', '불면증', '집중력'] },
+  { id: 1, title: '파도 소리',       artist: '해변 백색소음',  icon: '🌊', url: '/sounds/wave.mp3',    tags: ['피로회복', '긴장완화', '명상'] },
+  { id: 2, title: '숲속 바람',       artist: '자연 백색소음',  icon: '🌿', url: '/sounds/forest.mp3',  tags: ['수면유도', '자연치유', '안정'] },
+  { id: 3, title: 'Deep Sleep Waves', artist: 'Binaural Beats', icon: '🎵', url: '/sounds/sleep.mp3',   tags: ['깊은수면', '뇌파조절', '다크서클'] },
+  { id: 4, title: '산속 계곡',       artist: '자연 백색소음',  icon: '🏔', url: '/sounds/valley.mp3',  tags: ['스트레스', '자연치유', '안정'] },
+  { id: 5, title: '캠프파이어',      artist: '자연 백색소음',  icon: '🔥', url: '/sounds/fire.mp3',    tags: ['긴장완화', '명상', '안정'] },
 ];
 
 // 분석결과 기반 AI 추천 로직
