@@ -131,6 +131,8 @@ const PLAN_INFO = {
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [activePlan, setActivePlan] = useState(initialPlan);
   const [gptSolutions, setGptSolutions] = useState([]);
+  const [todayDayNumber, setTodayDayNumber] = useState(1); // 서버에서 받은 day_number 저장
+  const [missions, setMissions] = useState([]); // DB에서 가져온 detail_idx가 포함된 진짜 미션들
   const [gptAnalysis, setGptAnalysis]   = useState("");
   const [loadingGpt, setLoadingGpt]     = useState(false);
   const [activeDay, setActiveDay]       = useState(1);
@@ -164,32 +166,68 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       const cachedData = localStorage.getItem('last_gpt_coaching');
       const analysisId = analysisResult ? JSON.stringify(analysisResult) : 'no_data';
       if (cachedData) {
-        const { id, solutions, analysis } = JSON.parse(cachedData);
-        if (id === analysisId) {
-          setGptSolutions(solutions || []);
-          setGptAnalysis(analysis || "");
-          return;
+          const { id, solutions, analysis } = JSON.parse(cachedData);
+          if (id === analysisId) {
+            // 1. 저장된 분석 결과는 바로 화면에 보여주고
+            setGptSolutions(solutions || []);
+            setGptAnalysis(analysis || "");
+
+            // 2. 🔥 [중요] 하지만 체크박스 미션은 DB에서 새로 가져와야 함!
+            const userIdx = localStorage.getItem('user_idx') || "1008";
+            const missionRes = await axios.get(`http://localhost:7000/api/plan/today-missions?user_idx=${userIdx}`);
+            if (missionRes.data.success) {
+              setMissions(missionRes.data.missions);
+              setTodayDayNumber(missionRes.data.current_day);
+              setActiveDay(missionRes.data.current_day);
+            }
+            
+            setLoadingGpt(false); // 로딩 종료
+            return; // 여기서 끝내기
+          }
         }
-      }
       setLoadingGpt(true);
-      try {
-        const userIdx = localStorage.getItem('user_idx') || "1008";
-        const token   = localStorage.getItem('token');
-        const response = await axios.post('http://localhost:7000/api/coaching/analyze',
-          { user_idx: parseInt(userIdx) },
-          { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
-        );
-        if (isMounted && response.data.success) {
-          const { solutions, comparison_analysis } = response.data;
-          setGptSolutions(solutions || []);
-          setGptAnalysis(comparison_analysis || "");
-          localStorage.setItem('last_gpt_coaching', JSON.stringify({ id: analysisId, solutions, analysis: comparison_analysis }));
+        try {
+          const userIdx = localStorage.getItem('user_idx') || "1008";
+          const token   = localStorage.getItem('token');
+
+          // 1. AI 분석 요청
+          const response = await axios.post('http://localhost:7000/api/coaching/analyze',
+            { user_idx: parseInt(userIdx) },
+            { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
+          );
+
+          if (isMounted && response.data.success) {
+            const { solutions, comparison_analysis } = response.data;
+            setGptSolutions(solutions || []);
+            setGptAnalysis(comparison_analysis || "");
+
+            // 2. [추가] 분석 결과를 DB 미션 테이블에 반영(최적화)
+            await axios.post('http://localhost:7000/api/coaching/apply-optimization', {
+              user_idx: parseInt(userIdx),
+              solutions: solutions 
+            }, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
+
+            // 3. [추가] DB에서 진짜 미션과 날짜 정보 가져오기
+            const missionRes = await axios.get(`http://localhost:7000/api/plan/today-missions?user_idx=${userIdx}`);
+            if (missionRes.data.success) {
+              setMissions(missionRes.data.missions);
+              setTodayDayNumber(missionRes.data.current_day);
+              setActiveDay(missionRes.data.current_day);
+            }
+
+            // 4. 🔥 지우면 안 되는 로컬 스토리지 저장 로직!
+            // (분석 결과를 기억해둬서 다음 접속 때 또 요청 안 가게 함)
+            localStorage.setItem('last_gpt_coaching', JSON.stringify({ 
+              id: analysisId, 
+              solutions, 
+              analysis: comparison_analysis 
+            }));
+          }
+        } catch (error) {
+          console.error("GPT 코칭 로드 실패:", error);
+        } finally {
+          if (isMounted) setLoadingGpt(false);
         }
-      } catch (error) {
-        console.error("GPT 코칭 로드 실패:", error);
-      } finally {
-        if (isMounted) setLoadingGpt(false);
-      }
     };
     fetchGptCoaching();
     return () => { isMounted = false; };
@@ -243,9 +281,25 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   }, 0);
   const planProgress = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
 
-  const toggleCheck = (missionId) => {
-    setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
-  };
+  const toggleCheck = async (detail_idx, currentStatus) => {
+      try {
+        const userIdx = localStorage.getItem('user_idx') || "1008";
+        const newStatus = currentStatus === 1 ? 0 : 1;
+        
+        // DB에 "나 이거 완료했어"라고 보고하는 로직
+        await axios.patch('http://localhost:7000/api/plan/mission/check', {
+          detail_idx: detail_idx,
+          is_completed: newStatus
+        });
+
+        // 서버 보고 성공하면, 내 화면(missions 상태)에서도 체크 표시를 바꿔줌
+        setMissions(prev => 
+          prev.map(m => m.detail_idx === detail_idx ? { ...m, is_completed: newStatus } : m)
+        );
+      } catch (error) {
+        console.error("체크 저장 실패:", error);
+      }
+    };
 
   const handlePlanChange = (plan) => { setActivePlan(plan); setActiveDay(1); };
 
@@ -332,33 +386,70 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         </div>
       </div>
 
-      {/* 오늘 미션 */}
+{/* 오늘 미션 */}
       <div className="section-title">DAY {activeDay} — {currentDay.title}</div>
       <div className="coaching-card">
+        {/* 상단 캐릭터 & 진행도 섹션 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
           <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(110,231,247,0.08)', border: '1px solid rgba(110,231,247,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>{char.emoji}</div>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
               <span>{char.msg}</span>
-              <span style={{ color: doneMissions === totalMissions ? '#22c55e' : 'var(--accent)' }}>{doneMissions}/{totalMissions} 완료</span>
+              <span style={{ color: missions.filter(m => m.is_completed === 1).length === missions.length ? '#22c55e' : 'var(--accent)' }}>
+                {missions.filter(m => m.is_completed === 1).length}/{missions.length} 완료
+              </span>
             </div>
             <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progressPct}%`, background: progressPct === 100 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,var(--accent),#4dd8ee)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+              <div style={{ 
+                height: '100%', 
+                width: `${missions.length > 0 ? Math.round((missions.filter(m => m.is_completed === 1).length / missions.length) * 100) : 0}%`, 
+                background: missions.every(m => m.is_completed === 1) && missions.length > 0 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,var(--accent),#4dd8ee)', 
+                borderRadius: '4px', 
+                transition: 'width 0.4s ease' 
+              }} />
             </div>
           </div>
         </div>
+
+        {/* 실제 미션 리스트 (서버에서 가져온 missions 사용) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {currentDay.missions.map(mission => {
-            const isChecked = dayChecks[mission.id] || false;
-            const tc = TYPE_COLOR[mission.type];
-            return (
-              <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
-                <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`, background: isChecked ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#0b0b13', fontWeight: 700 }}>{isChecked && '✓'}</div>
-                <span style={{ fontSize: '12px', flex: 1, textDecoration: isChecked ? 'line-through' : 'none', color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)' }}>{mission.text}</span>
-                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color }}>{mission.type}</span>
-              </div>
-            );
-          })}
+          {missions.length > 0 ? (
+            missions.map((mission, index) => {
+              const isChecked = mission.is_completed === 1;
+              const typeLabel = index < 2 ? '필수' : index < 4 ? '권장' : '선택';
+              const tc = TYPE_COLOR[typeLabel];
+
+              return (
+                <div key={mission.detail_idx} 
+                     onClick={() => toggleCheck(mission.detail_idx, mission.is_completed)} 
+                     style={{ 
+                       display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', 
+                       background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', 
+                       border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, 
+                       borderRadius: '10px', cursor: 'pointer' 
+                     }}>
+                  <div style={{ 
+                    width: '20px', height: '20px', borderRadius: '6px', 
+                    border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`, 
+                    background: isChecked ? 'var(--accent)' : 'transparent', 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#0b0b13', fontWeight: 700 
+                  }}>
+                    {isChecked && '✓'}
+                  </div>
+                  <span style={{ fontSize: '12px', flex: 1, textDecoration: isChecked ? 'line-through' : 'none', color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)' }}>
+                    {mission.plan_task}
+                  </span>
+                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color }}>
+                    {typeLabel}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted)', padding: '20px' }}>
+              오늘의 미션을 불러오는 중입니다...
+            </p>
+          )}
         </div>
       </div>
 
