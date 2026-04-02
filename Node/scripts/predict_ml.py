@@ -14,7 +14,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # 1. 상수 정의
 # =====================================================
 SLEEP_TARGET_HOURS = 7.5
-SIGMA_UNDER = 3.8
+SIGMA_UNDER = 2.5
 SIGMA_OVER = 5.0
 
 CAFFEINE_MAP = {
@@ -54,15 +54,33 @@ if model is None:
     handle_error("모델 파일을 찾을 수 없습니다.")
 
 # =====================================================
-# 4. 가우시안 점수 함수
+# 4. 3구간 비대칭 가우시안 점수 함수 (수정됨)
 # =====================================================
 def get_asymmetric_sleep_score(predicted_hours):
-    if predicted_hours <= SLEEP_TARGET_HOURS:
-        sigma = SIGMA_UNDER
+    target = SLEEP_TARGET_HOURS
+    mid_point = 5.0  # 5시간 기준점
+    
+    # 구간별 sigma 값 (아까 코드에서 가져옴)
+    sigma_high = 2.0   # 5~7.5시간 (급격한 감소)
+    sigma_low = 1.5   # 2~5시간 (애무 급격한 감소)
+    sigma_excess = 5.0 # 7.5시간 초과 (매우 완만)
+    
+    # 1. 7.5시간 초과
+    if predicted_hours > target:
+        score = 100 * math.exp(-((predicted_hours - target)**2) / (2 * sigma_excess**2))
+    
+    # 2. 5시간 ~ 7.5시간 (급격 감소)
+    elif predicted_hours >= mid_point:
+        score = 100 * math.exp(-((predicted_hours - target)**2) / (2 * sigma_high**2))
+    
+    # 3. 2시간 ~ 5시간 (완만 감소)
     else:
-        sigma = SIGMA_OVER
-    score = 100 * math.exp(-((predicted_hours - SLEEP_TARGET_HOURS) ** 2) / (2 * sigma ** 2))
-    return round(score, 1)
+        # 5시간에서의 점수를 기준으로 이어지도록 조정
+        score_at_5 = 100 * math.exp(-((mid_point - target)**2) / (2 * sigma_high**2))
+        # 5시간 이하 구간은 별도의 sigma로 감소
+        score = score_at_5 * math.exp(-((predicted_hours - mid_point)**2) / (2 * sigma_low**2))
+    
+    return round(max(0, score), 1)
 
 # =====================================================
 # 5. 피로 원인 분석 함수 (순위용 - 가중치 적용)
