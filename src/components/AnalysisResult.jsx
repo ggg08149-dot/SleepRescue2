@@ -8,6 +8,13 @@ const getFatigueMessage = (fatigue, userName, causeName) => {
   return `수면 구조대가 분석해보니, 오늘 ${userName}님의 피로는 안정적인 '낮음' 단계예요. ${causeName} 수치가 잘 관리되고 있어 눈가도 평소보다 훨씬 맑고 생기 있어 보이는 상태예요.`;
 };
 
+// 홈탭 피로지수와 동일한 이모지/색상 로직
+const getFatigueEmoji = (fatigue) => {
+  if (fatigue === 'high') return { emoji: '😵', color: '#ef4444' };
+  if (fatigue === 'mid')  return { emoji: '😟', color: '#f59e0b' };
+  return { emoji: '😊', color: '#22c55e' };
+};
+
 const FATIGUE_LEVELS = [
   { key: 'high', label: '높음', icon: '🔥', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)' },
   { key: 'mid',  label: '주의', icon: '⚠️', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.5)' },
@@ -20,7 +27,6 @@ const PLAN_DATA = [
   { n: 15, days: '15', label: '15일 플랜', desc: '만성 피로 탈출 프로젝트.\n다크서클 없는 맑은 아침을 약속합니다.' },
 ];
 
-// DB 레코드 → ResultCard props 변환
 const toResultProps = (row) => ({
   fatigue      : row.fatigue_level,
   fatigueCause : row.fatigue_reason,
@@ -30,14 +36,19 @@ const toResultProps = (row) => ({
   fatigue_idx  : row.fatigue_idx,
 });
 
-// ─── 결과 카드 (단일) ────────────────────────────
+// ─── 결과 카드 ────────────────────────────────────
 export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching, planSaving = false }) {
   if (!result) return null;
   const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue) || FATIGUE_LEVELS[0];
+  const { emoji, color: emojiColor } = getFatigueEmoji(result.fatigue);
+  const fatigueScore = Math.round(result.fatigueScore || result.score || 0);
   const causeName = result.fatigueCause === '모든 항목이 양호한 상태입니다.'
     ? '누적된 피로'
     : result.fatigueCause || '복합적 요인';
   const msg = getFatigueMessage(result.fatigue, userName, causeName);
+
+  // 게이지 대시오프셋 계산 (홈탭과 동일한 로직)
+  const fatigueDash = 264 - (264 * (fatigueScore / 100));
 
   return (
     <div>
@@ -52,7 +63,7 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
         </div>
 
         {/* 3단계 인디케이터 */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '20px' }}>
           {FATIGUE_LEVELS.map(level => {
             const isActive = result.fatigue === level.key;
             return (
@@ -73,6 +84,65 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
               </div>
             );
           })}
+        </div>
+
+        {/* ✅ 피로지수 게이지 (홈탭과 동일) */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px',
+          background: 'rgba(255,255,255,0.04)', borderRadius: '14px',
+          padding: '16px', marginBottom: '16px',
+          border: `1px solid ${lv.border}`,
+        }}>
+          {/* SVG 게이지 */}
+          <div style={{ position: 'relative', width: '80px', height: '80px' }}>
+            <svg viewBox="0 0 100 100" width="80" height="80">
+              <defs>
+                <linearGradient id="faGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#6ee7f7" />
+                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#ef4444" />
+                </linearGradient>
+              </defs>
+              <circle cx="50" cy="50" r="42" fill="none"
+                stroke="rgba(255,255,255,0.05)" strokeWidth="7"/>
+              <circle cx="50" cy="50" r="42" fill="none"
+                stroke="url(#faGrad)" strokeWidth="7" strokeLinecap="round"
+                strokeDasharray="264"
+                strokeDashoffset={fatigueDash}
+                transform="rotate(-90 50 50)"
+                style={{ transition: 'stroke-dashoffset 1.4s ease' }}/>
+            </svg>
+            {/* 이모지 (홈탭과 동일) */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <div style={{ fontSize: '24px', lineHeight: 1 }}>{emoji}</div>
+            </div>
+          </div>
+
+          {/* 수치 + 라벨 */}
+          <div>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: '44px', lineHeight: 1,
+              color: emojiColor,
+            }}>
+              {fatigueScore}%
+            </div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+              피로지수
+            </div>
+            <div style={{
+              marginTop: '6px', fontSize: '11px', fontWeight: 700,
+              padding: '3px 10px', borderRadius: '20px',
+              background: lv.bg, border: `1px solid ${lv.border}`,
+              color: lv.color, display: 'inline-block',
+            }}>
+              {lv.label}
+            </div>
+          </div>
         </div>
 
         {/* 피로 원인 */}
@@ -136,20 +206,18 @@ const fatigueColor = (f) => f === 'high' ? '#ef4444' : f === 'mid' ? '#f59e0b' :
 const fatigueLabel = (f) => f === 'high' ? '높음' : f === 'mid' ? '주의' : '낮음';
 const fatigueIcon  = (f) => f === 'high' ? '🔥' : f === 'mid' ? '⚠️' : '✅';
 
-// ─── 분석 결과 탭 (DB 히스토리 포함) ──────────────
+// ─── 분석 결과 탭 ─────────────────────────────────
 function AnalysisResult({ currentResult, existingResult, userName, userIdx, startCoaching, onSwitchToScan }) {
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [history, setHistory]           = useState([]);
+  const [selectedPlan, setSelectedPlan]     = useState(null);
+  const [history, setHistory]               = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [expanded, setExpanded]         = useState(false);
-  const [viewItem, setViewItem]         = useState(null);
-  const [planSaving, setPlanSaving]     = useState(false);
+  const [expanded, setExpanded]             = useState(false);
+  const [viewItem, setViewItem]             = useState(null);
+  const [planSaving, setPlanSaving]         = useState(false);
 
-  // history[0]을 fallback으로: 새로고침·재시작 시에도 최근 기록 표시
   const latestFromDB  = history.length > 0 ? toResultProps(history[0]) : null;
   const displayResult = currentResult || existingResult || latestFromDB;
 
-  // 날짜 라벨 계산 (currentResult는 방금 분석한 결과 → 미표기)
   const dateLabel = (() => {
     if (currentResult) return null;
     const src = existingResult || latestFromDB;
@@ -161,7 +229,6 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     return `${diff}일 전 기록입니다`;
   })();
 
-  // 플랜 저장 후 코칭 화면 이동
   const handleStartCoaching = async (planN) => {
     if (!planN) return;
     setPlanSaving(true);
@@ -175,7 +242,6 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     startCoaching(planN);
   };
 
-  // DB에서 히스토리 불러오기
   const fetchHistory = async () => {
     if (!userIdx) { setHistoryLoading(false); return; }
     try {
@@ -188,11 +254,8 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     }
   };
 
-  useEffect(() => {
-    fetchHistory();
-  }, [currentResult, userIdx]);
+  useEffect(() => { fetchHistory(); }, [currentResult, userIdx]);
 
-  // DB 삭제
   const handleDelete = async (e, fatigue_idx) => {
     e.stopPropagation();
     if (!window.confirm('이 분석 결과를 삭제할까요?')) return;
@@ -209,20 +272,16 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     }
   };
 
-  const historyList    = history;
-  const visibleCount   = expanded ? historyList.length : 2;
-  const visibleHistory = historyList.slice(0, visibleCount);
+  const visibleHistory = history.slice(0, expanded ? history.length : 2);
 
   return (
     <div>
-      {/* 이전 결과 상세 보기 모드 */}
       {viewItem ? (
         <>
           <button onClick={() => setViewItem(null)} style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             background: 'linear-gradient(135deg, rgba(110,231,247,0.15), rgba(110,231,247,0.08))',
-            border: '1px solid rgba(110,231,247,0.4)',
-            color: '#6ee7f7',
+            border: '1px solid rgba(110,231,247,0.4)', color: '#6ee7f7',
             padding: '10px 20px', borderRadius: '10px', cursor: 'pointer',
             fontFamily: "'Noto Sans KR', sans-serif", fontSize: '14px', fontWeight: 600,
             marginBottom: '14px', width: '100%', justifyContent: 'center',
@@ -233,18 +292,11 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
           <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '10px' }}>
             📅 {viewItem.savedAt} 분석 결과
           </div>
-          <ResultCard
-            result={viewItem}
-            userName={userName}
-            selectedPlan={selectedPlan}
-            onSelectPlan={setSelectedPlan}
-            onStartCoaching={() => handleStartCoaching(selectedPlan)}
-            planSaving={planSaving}
-          />
+          <ResultCard result={viewItem} userName={userName} selectedPlan={selectedPlan}
+            onSelectPlan={setSelectedPlan} onStartCoaching={() => handleStartCoaching(selectedPlan)} planSaving={planSaving} />
         </>
       ) : (
         <>
-          {/* 현재/최근 분석 결과 */}
           {historyLoading ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)', fontSize: '13px' }}>
               ⏳ 분석 기록을 불러오는 중...
@@ -252,43 +304,23 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
           ) : displayResult ? (
             <>
               {dateLabel && (
-                <div style={{
-                  marginBottom: '10px', padding: '8px 14px',
-                  background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)',
-                  borderRadius: '10px', fontSize: '12px', color: 'var(--accent2)',
-                  textAlign: 'center', fontWeight: 500,
-                }}>
+                <div style={{ marginBottom: '10px', padding: '8px 14px', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '10px', fontSize: '12px', color: 'var(--accent2)', textAlign: 'center', fontWeight: 500 }}>
                   📅 {dateLabel}
                 </div>
               )}
-              <ResultCard
-                result={displayResult}
-                userName={userName}
-                selectedPlan={selectedPlan}
-                onSelectPlan={setSelectedPlan}
-                onStartCoaching={() => handleStartCoaching(selectedPlan)}
-                planSaving={planSaving}
-              />
+              <ResultCard result={displayResult} userName={userName} selectedPlan={selectedPlan}
+                onSelectPlan={setSelectedPlan} onStartCoaching={() => handleStartCoaching(selectedPlan)} planSaving={planSaving} />
             </>
           ) : (
-            <div style={{
-              textAlign: 'center', padding: '50px 20px',
-              background: 'var(--bg2)', borderRadius: '16px',
-              border: '1px solid var(--border)', marginBottom: '14px',
-            }}>
+            <div style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--bg2)', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '14px' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: 'var(--accent)', marginBottom: '8px' }}>
-                아직 분석 결과가 없어요
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
-                스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
-              </div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: 'var(--accent)', marginBottom: '8px' }}>아직 분석 결과가 없어요</div>
+              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!</div>
               <button onClick={onSwitchToScan} className="scan-btn">📷 분석하러 가기</button>
             </div>
           )}
 
-          {/* 이전 분석 결과 목록 */}
-          {historyList.length > 0 && (
+          {history.length > 0 && (
             <>
               <div className="section-title" style={{ marginTop: '8px' }}>이전 분석 결과</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -296,44 +328,25 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
                   const props = toResultProps(item);
                   return (
                     <div key={item.fatigue_idx}
-                      style={{
-                        background: 'var(--bg2)', border: '1px solid var(--border)',
-                        borderRadius: '12px', padding: '14px 16px',
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        cursor: 'pointer', transition: 'all 0.2s',
-                      }}
+                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
                       onClick={() => setViewItem(props)}
                     >
                       <div style={{ fontSize: '22px' }}>{fatigueIcon(item.fatigue_level)}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                          <span style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: '13px', fontWeight: 700, color: '#fff' }}>
-                            피로도
-                          </span>
-                          <span style={{
-                            fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700,
-                            color: fatigueColor(item.fatigue_level),
-                            background: `${fatigueColor(item.fatigue_level)}22`,
-                            border: `1px solid ${fatigueColor(item.fatigue_level)}66`,
-                          }}>
+                          <span style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: '13px', fontWeight: 700, color: '#fff' }}>피로도</span>
+                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700, color: fatigueColor(item.fatigue_level), background: `${fatigueColor(item.fatigue_level)}22`, border: `1px solid ${fatigueColor(item.fatigue_level)}66` }}>
                             {fatigueLabel(item.fatigue_level)}
                           </span>
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                          📅 {item.created_at}
-                          {item.fatigue_reason && ` · ${item.fatigue_reason.slice(0, 15)}...`}
+                          📅 {item.created_at}{item.fatigue_reason && ` · ${item.fatigue_reason.slice(0, 15)}...`}
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: 'var(--muted)' }}>상세보기 ▶</span>
-                        <button
-                          onClick={(e) => handleDelete(e, item.fatigue_idx)}
-                          style={{
-                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                            color: '#f87171', borderRadius: '8px', padding: '4px 8px',
-                            cursor: 'pointer', fontSize: '11px', fontFamily: "'Noto Sans KR', sans-serif",
-                          }}
-                        >
+                        <button onClick={(e) => handleDelete(e, item.fatigue_idx)}
+                          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', fontSize: '11px', fontFamily: "'Noto Sans KR', sans-serif" }}>
                           삭제
                         </button>
                       </div>
@@ -342,21 +355,10 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
                 })}
               </div>
 
-              {/* 펼쳐보기 / 접기 버튼 */}
-              {historyList.length > 2 && (
-                <button
-                  onClick={() => setExpanded(prev => !prev)}
-                  style={{
-                    width: '100%', marginTop: '8px', padding: '10px',
-                    background: 'var(--bg2)', border: '1px solid var(--border)',
-                    borderRadius: '10px', color: 'var(--muted)',
-                    fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {expanded
-                    ? `▲ 접기`
-                    : `▼ 펼쳐보기 (${historyList.length - 2}건 더보기)`}
+              {history.length > 2 && (
+                <button onClick={() => setExpanded(prev => !prev)}
+                  style={{ width: '100%', marginTop: '8px', padding: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--muted)', fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px', cursor: 'pointer' }}>
+                  {expanded ? '▲ 접기' : `▼ 펼쳐보기 (${history.length - 2}건 더보기)`}
                 </button>
               )}
             </>

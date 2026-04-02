@@ -80,27 +80,35 @@ const getGptCoaching = (req, res) => {
 };
 
 /**
- * [추가] 사용자가 '재측정 결과 반영(B안)'을 승인했을 때 호출되는 API
+ * [수정] 사용자가 '재측정 결과 반영(B안)'을 승인했을 때 호출되는 API
  */
 const applyOptimization = (req, res) => {
   const { user_idx, solutions } = req.body;
-  
-  // 1. 현재 활성화된 플랜 찾기
-  planModel.getActivePlan(user_idx, (err, planResult) => { // 변수명을 planResult로 변경 (배열임을 인지)
-    // [수정 포인트] 배열에서 첫 번째 객체를 꺼내옵니다.
+
+  // 1. 오전 7시 기준, 오늘이 몇 일차인지 포함된 플랜 정보 가져오기
+  planModel.getPlanWithDayNumber(user_idx, (err, planResult) => {
     const plan = (planResult && planResult.length > 0) ? planResult[0] : null;
 
-    if (err || !plan) return res.status(404).json({ success: false, message: "진행 중인 플랜이 없습니다." });
+    if (err || !plan) {
+      return res.status(404).json({ success: false, message: "진행 중인 플랜이 없습니다." });
+    }
 
-    // 2. 오늘이 몇 일차인지 계산 (단순화: start_date와 현재 차이)
-    const start = new Date(plan.start_date);
-    const now = new Date();
-    const day_number = Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1;
+    // 모델이 쿼리로 계산해준 일차(current_day_number)를 그대로 사용합니다.
+    const day_number = plan.current_day_number;
+    const plan_idx = plan.plan_idx;
 
-    // 3. B안 실행: 오늘 일차 미션 전체 교체
-    planModel.resetDailyMissions(plan.plan_idx, user_idx, day_number, solutions, (err2) => {
-      if (err2) return res.status(500).json({ success: false, message: "플랜 최적화 실패" });
-      res.json({ success: true, message: "오늘의 미션이 최신 상태로 재설정되었습니다." });
+    // 2. 해당 일차 미션 전체 교체 (기존에 이미 오늘 분석을 했더라도 덮어씌워짐)
+    planModel.resetDailyMissions(plan_idx, user_idx, day_number, solutions, (err2) => {
+      if (err2) {
+        console.error('❌ 플랜 최적화 오류:', err2.message);
+        return res.status(500).json({ success: false, message: "플랜 최적화 실패" });
+      }
+      
+      res.json({ 
+        success: true, 
+        day_number, // 프론트에서 "Day 3 미션이 업데이트됨"을 알 수 있게 전달
+        message: "오늘의 미션이 최신 상태로 재설정되었습니다." 
+      });
     });
   });
 };

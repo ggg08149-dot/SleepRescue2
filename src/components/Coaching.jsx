@@ -158,13 +158,11 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   }, [timeLeft]);
 
   // GPT 코칭 fetch (기존 로직 그대로 유지)
-
   useEffect(() => {
     let isMounted = true;
     const fetchGptCoaching = async () => {
       const cachedData = localStorage.getItem('last_gpt_coaching');
       const analysisId = analysisResult ? JSON.stringify(analysisResult) : 'no_data';
-      
       if (cachedData) {
         const { id, solutions, analysis } = JSON.parse(cachedData);
         if (id === analysisId) {
@@ -173,35 +171,19 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           return;
         }
       }
-
       setLoadingGpt(true);
       try {
         const userIdx = localStorage.getItem('user_idx') || "1008";
-        const token = localStorage.getItem('token');
-        // 1. AI 분석 요청
-        const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
-          { user_idx: parseInt(userIdx) }, 
+        const token   = localStorage.getItem('token');
+        const response = await axios.post('http://localhost:7000/api/coaching/analyze',
+          { user_idx: parseInt(userIdx) },
           { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
         );
-
         if (isMounted && response.data.success) {
           const { solutions, comparison_analysis } = response.data;
           setGptSolutions(solutions || []);
           setGptAnalysis(comparison_analysis || "");
-
-        // [추가] 2. 받은 솔루션을 DB(tb_plan_detail)에 실제로 저장하기
-        await axios.post('http://localhost:7000/api/coaching/apply-optimization', {
-          user_idx: parseInt(userIdx),
-          solutions: solutions // AI가 만든 5개 문장 배열
-        }, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
-        
-        console.log("✅ AI 솔루션이 DB에 동기화되었습니다.");
-
-        localStorage.setItem('last_gpt_coaching', JSON.stringify({
-            id: analysisId,
-            solutions,
-            analysis: comparison_analysis
-          }));
+          localStorage.setItem('last_gpt_coaching', JSON.stringify({ id: analysisId, solutions, analysis: comparison_analysis }));
         }
       } catch (error) {
         console.error("GPT 코칭 로드 실패:", error);
@@ -209,7 +191,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         if (isMounted) setLoadingGpt(false);
       }
     };
-    
     fetchGptCoaching();
     return () => { isMounted = false; };
   }, [analysisResult]);
@@ -332,27 +313,22 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         })}
       </div>
 
-      {/* 분석 결과 헤더 */}
-      <div className="coaching-result-header">
-        <div className="section-title" style={{ color: 'var(--accent2)' }}>ANALYSIS RESULT</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '12px' }}>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '52px', color: '#fff', lineHeight: 1 }}>{fatigueNum}</div>
-          <div>
-            <div style={{ fontSize: '14px', color: fatigueColor, fontWeight: 700 }}>{fatigueLabel}</div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 300 }}>피로도 지수</div>
-          </div>
+      {/* 플랜 진행 퍼센트 */}
+      <div style={{
+        background: 'rgba(110,231,247,0.06)',
+        border: '1px solid rgba(110,231,247,0.2)',
+        borderRadius: '14px', padding: '14px 16px',
+        marginBottom: '14px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+          {activePlan}일 플랜 진행률
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {[
-            { l: '다크서클', v: `${darkCircle}%`, c: fatigueColor },
-            { l: '수면점수',  v: `${sleepScore}`,  c: '#f59e0b' },
-            { l: `${activePlan}일 진행`, v: `${planProgress}%`, c: '#6ee7f7' },
-          ].map(i => (
-            <div key={i.l} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px 14px', flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>{i.l}</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '22px', color: i.c }}>{i.v}</div>
-            </div>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '100px', height: '6px', background: 'rgba(255,255,255,0.07)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${planProgress}%`, background: 'linear-gradient(90deg,var(--accent),#4dd8ee)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+          </div>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '22px', color: 'var(--accent)' }}>{planProgress}%</div>
         </div>
       </div>
 
