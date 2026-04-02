@@ -59,28 +59,6 @@ const getGptCoaching = (req, res) => {
 
       const { solutions, analysis } = pythonResponse.data;
 
-      // ================= [여기서부터 수정 및 추가된 로직] =================
-      
-      // A. 현재 진행 중인 플랜(tb_plan) 정보를 가져옵니다.
-      planModel.getActivePlan(user_idx, (err, planResult) => {
-        if (err || !planResult || planResult.length === 0) {
-          console.error("❌ 진행 중인 플랜이 없어 DB 저장을 건너뜁니다.");
-        } else {
-          const plan = planResult[0]; // 가장 최근 플랜 정보
-          const plan_idx = plan.plan_idx;
-
-          // B. 오늘이 플랜 시작일로부터 며칠째인지 계산 (day_number)
-          const start = new Date(plan.start_date);
-          const now = new Date();
-          const day_number = Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1;
-
-          // C. tb_plan_detail에 plan_task(솔루션 내용)와 plan_type=1을 넣습니다.
-          planModel.resetDailyMissions(plan_idx, user_idx, day_number, solutions, (err2) => {
-            if (err2) console.error("❌ tb_plan_detail 저장 실패:", err2);
-            else console.log(`✅ ${day_number}일차 AI 미션 5개 저장 완료! (plan_type: 1)`);
-          });
-        }
-      });
 
       // =================================================================
 

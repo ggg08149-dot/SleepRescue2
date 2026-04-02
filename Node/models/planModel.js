@@ -59,12 +59,11 @@ const resetDailyMissions = (plan_idx, user_idx, day_number, newTasks, cb) => {
 /**
  * 새로운 플랜 마스터 정보를 생성합니다.
  */
-const insertPlan = (user_idx, plan_content, cb) => {
-  // start_date는 DB에서 NOW()로 자동 입력되게 하거나 직접 넣습니다.
-  const sql = `INSERT INTO tb_plan (user_idx, plan_content, start_date) VALUES (?, ?, NOW())`;
-  db.query(sql, [user_idx, plan_content], cb);
+const insertPlan = (user_idx, plan_type, cb) => {
+  // [수정] plan_content -> plan_task (DB 컬럼명에 맞춰 수정)
+  const sql = `INSERT INTO tb_plan (user_idx, plan_type, start_date) VALUES (?, ?, NOW())`;
+  db.query(sql, [user_idx, plan_type], cb);
 };
-
 /**
  * [A안: 부분 최적화] 완료되지 않은 미션만 선별적으로 교체합니다.
  */
