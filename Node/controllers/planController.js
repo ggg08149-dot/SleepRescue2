@@ -15,4 +15,14 @@ const savePlan = (req, res) => {
   });
 };
 
-module.exports = { savePlan };
+// planController.js 에 추가
+const toggleMission = (req, res) => {
+  const { detail_idx, is_completed } = req.body; // is_completed는 true(1) 또는 false(0)
+
+  planModel.updateMissionStatus(detail_idx, is_completed ? 1 : 0, (err, result) => {
+    if (err) return res.status(500).json({ success: false, message: err.message });
+    res.json({ success: true });
+  });
+};
+
+module.exports = { savePlan, toggleMission };

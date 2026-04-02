@@ -72,4 +72,25 @@ const updateIncompleteMissions = (plan_idx, day_number, newTasks, cb) => {
   // ... 생략 (B안 우선 구현 후 필요시 확장)
 };
 
-module.exports = { getActivePlan, getDailyMissions, resetDailyMissions, updateIncompleteMissions, insertPlan };
+/**
+ * 오전 7시 기준, 플랜 시작일로부터 오늘이 몇 일차인지 계산하여 플랜 정보를 가져옵니다.
+ */
+const getPlanWithDayNumber = (user_idx, cb) => {
+  // 현재 시간에서 7시간을 뺀 날짜와 시작일에서 7시간을 뺀 날짜의 차이를 구함
+  const sql = `
+    SELECT *, 
+    DATEDIFF(DATE_SUB(NOW(), INTERVAL 7 HOUR), DATE_SUB(start_date, INTERVAL 7 HOUR)) + 1 AS current_day_number
+    FROM tb_plan 
+    WHERE user_idx = ? AND status = 'active'
+    ORDER BY start_date DESC LIMIT 1
+  `;
+  db.query(sql, [user_idx], cb);
+};
+
+// 미션 체크 상태 업데이트 (프론트 체크박스용)
+const updateMissionStatus = (detail_idx, is_completed, cb) => {
+  const sql = `UPDATE tb_plan_detail SET is_completed = ? WHERE detail_idx = ?`;
+  db.query(sql, [is_completed, detail_idx], cb);
+};
+
+module.exports = { getActivePlan, getDailyMissions, resetDailyMissions, updateIncompleteMissions, insertPlan, getPlanWithDayNumber, updateMissionStatus };
