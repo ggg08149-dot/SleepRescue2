@@ -158,11 +158,13 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   }, [timeLeft]);
 
   // GPT 코칭 fetch (기존 로직 그대로 유지)
+
   useEffect(() => {
     let isMounted = true;
     const fetchGptCoaching = async () => {
       const cachedData = localStorage.getItem('last_gpt_coaching');
       const analysisId = analysisResult ? JSON.stringify(analysisResult) : 'no_data';
+      
       if (cachedData) {
         const { id, solutions, analysis } = JSON.parse(cachedData);
         if (id === analysisId) {
@@ -171,19 +173,35 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           return;
         }
       }
+
       setLoadingGpt(true);
       try {
         const userIdx = localStorage.getItem('user_idx') || "1008";
-        const token   = localStorage.getItem('token');
-        const response = await axios.post('http://localhost:7000/api/coaching/analyze',
-          { user_idx: parseInt(userIdx) },
+        const token = localStorage.getItem('token');
+        // 1. AI 분석 요청
+        const response = await axios.post('http://localhost:7000/api/coaching/analyze', 
+          { user_idx: parseInt(userIdx) }, 
           { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
         );
+
         if (isMounted && response.data.success) {
           const { solutions, comparison_analysis } = response.data;
           setGptSolutions(solutions || []);
           setGptAnalysis(comparison_analysis || "");
-          localStorage.setItem('last_gpt_coaching', JSON.stringify({ id: analysisId, solutions, analysis: comparison_analysis }));
+
+        // [추가] 2. 받은 솔루션을 DB(tb_plan_detail)에 실제로 저장하기
+        await axios.post('http://localhost:7000/api/coaching/apply-optimization', {
+          user_idx: parseInt(userIdx),
+          solutions: solutions // AI가 만든 5개 문장 배열
+        }, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
+        
+        console.log("✅ AI 솔루션이 DB에 동기화되었습니다.");
+
+        localStorage.setItem('last_gpt_coaching', JSON.stringify({
+            id: analysisId,
+            solutions,
+            analysis: comparison_analysis
+          }));
         }
       } catch (error) {
         console.error("GPT 코칭 로드 실패:", error);
@@ -191,6 +209,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         if (isMounted) setLoadingGpt(false);
       }
     };
+    
     fetchGptCoaching();
     return () => { isMounted = false; };
   }, [analysisResult]);
