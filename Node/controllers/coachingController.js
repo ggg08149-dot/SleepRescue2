@@ -9,7 +9,7 @@ const getGptCoaching = (req, res) => {
     return res.status(401).json({ success: false, message: "사용자 인증 정보가 없습니다." });
   }
 
-  // 1. 최근 2건의 피로도 분석 데이터를 가져와 비교 (Delta 계산용)
+  // 1. 최근 2건의 데이터 조회 (기존과 동일)
   coachingModel.getComparisonData(user_idx, async (err, result) => {
     if (err) return res.status(500).json({ success: false, message: "DB 조회 오류" });
 
@@ -20,14 +20,20 @@ const getGptCoaching = (req, res) => {
     const today = result[0];
     const yesterday = result.length > 1 ? result[1] : null;
 
-    // 델타 점수 계산 (피로도 점수 차이)
     const today_score = parseFloat(today.fatigue_score || 0);
     const yesterday_score = yesterday ? parseFloat(yesterday.fatigue_score || 0) : today_score;
     const delta = Math.abs(today_score - yesterday_score);
-    const is_critical = delta >= 15; // 15점 이상 차이 나면 Critical로 간주
+    const is_critical = delta >= 15;
 
     try {
-      // 2. FastAPI 호출 (비교 분석 및 미션 생성)
+      // axios.post 하기 바로 윗줄에 추가
+        console.log("🚀 FastAPI로 쏘는 데이터:", JSON.stringify({
+        user_idx: user_idx,
+        today: today,
+        yesterday: yesterday
+      }, null, 2));
+
+      // 2. FastAPI 호출 (AI 솔루션 5개 받아오기)
       const pythonResponse = await axios.post('http://localhost:8000/coaching', {
         user_idx: user_idx,
         today: {
@@ -50,16 +56,42 @@ const getGptCoaching = (req, res) => {
         } : null
       });
 
+
       const { solutions, analysis } = pythonResponse.data;
 
-      // 3. 응답 반환 (델타 정보와 크리티컬 여부 포함)
+      // ================= [여기서부터 수정 및 추가된 로직] =================
+      
+      // A. 현재 진행 중인 플랜(tb_plan) 정보를 가져옵니다.
+      planModel.getActivePlan(user_idx, (err, planResult) => {
+        if (err || !planResult || planResult.length === 0) {
+          console.error("❌ 진행 중인 플랜이 없어 DB 저장을 건너뜁니다.");
+        } else {
+          const plan = planResult[0]; // 가장 최근 플랜 정보
+          const plan_idx = plan.plan_idx;
+
+          // B. 오늘이 플랜 시작일로부터 며칠째인지 계산 (day_number)
+          const start = new Date(plan.start_date);
+          const now = new Date();
+          const day_number = Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1;
+
+          // C. tb_plan_detail에 plan_task(솔루션 내용)와 plan_type=1을 넣습니다.
+          planModel.resetDailyMissions(plan_idx, user_idx, day_number, solutions, (err2) => {
+            if (err2) console.error("❌ tb_plan_detail 저장 실패:", err2);
+            else console.log(`✅ ${day_number}일차 AI 미션 5개 저장 완료! (plan_type: 1)`);
+          });
+        }
+      });
+
+      // =================================================================
+
+      // 3. 응답 반환 (기존 응답은 그대로 유지)
       return res.status(200).json({
         success: true,
         solutions,
         comparison_analysis: analysis,
         delta_score: delta.toFixed(1),
-        is_critical, // 프론트에서 B안(전체 재설정) 추천 팝업을 띄울 근거
-        today_data: today // 최적화 시 참조할 데이터
+        is_critical,
+        today_data: today
       });
 
     } catch (error) {
@@ -76,7 +108,10 @@ const applyOptimization = (req, res) => {
   const { user_idx, solutions } = req.body;
   
   // 1. 현재 활성화된 플랜 찾기
-  planModel.getActivePlan(user_idx, (err, plan) => {
+  planModel.getActivePlan(user_idx, (err, planResult) => { // 변수명을 planResult로 변경 (배열임을 인지)
+    // [수정 포인트] 배열에서 첫 번째 객체를 꺼내옵니다.
+    const plan = (planResult && planResult.length > 0) ? planResult[0] : null;
+
     if (err || !plan) return res.status(404).json({ success: false, message: "진행 중인 플랜이 없습니다." });
 
     // 2. 오늘이 몇 일차인지 계산 (단순화: start_date와 현재 차이)
