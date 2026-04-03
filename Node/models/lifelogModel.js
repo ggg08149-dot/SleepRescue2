@@ -10,6 +10,13 @@ const updateSleepScore = (sleep_score, lifelog_idx, cb) => {
   db.query('UPDATE tb_lifelog SET sleep_score = ? WHERE lifelog_idx = ?', [sleep_score, lifelog_idx], cb);
 };
 
+const updateSleepPrediction = (sleep_hours, sleep_score, lifelog_idx, cb) => {
+  const sql = `UPDATE tb_lifelog 
+               SET sleep_hours = ?, sleep_score = ? 
+               WHERE lifelog_idx = ?`;
+  db.query(sql, [sleep_hours, sleep_score, lifelog_idx], cb);
+};
+
 // 사용자의 가장 최근 lifelog 1건
 const getLatestByUser = (user_idx, cb) => {
   const sql = `SELECT exec_hours, phone_hours, work_hours, caffeine, sleep_hours, sleep_score
@@ -23,4 +30,4 @@ const getLatestByUser = (user_idx, cb) => {
   });
 };
 
-module.exports = { insert, updateSleepScore, getLatestByUser };
+module.exports = { insert, updateSleepScore, updateSleepPrediction, getLatestByUser };

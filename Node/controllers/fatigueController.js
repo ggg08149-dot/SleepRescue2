@@ -60,7 +60,7 @@ const saveFatigue = (req, res) => {
           return res.status(500).json({ success: false, message: 'fatigue 저장에 실패했습니다.' });
         }
 
-        lifelogModel.updateSleepScore(sleep_score, lifelog_idx, (err2) => {
+        lifelogModel.updateSleepPrediction(predicted_hours, sleep_score, lifelog_idx, (err2) => {
           if (err2) {
             console.error('❌ lifelog 업데이트 오류:', err2);
             return res.status(500).json({ success: false, message: 'lifelog 업데이트에 실패했습니다.' });
