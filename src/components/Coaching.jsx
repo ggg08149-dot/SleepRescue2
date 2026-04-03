@@ -256,29 +256,14 @@ function Coaching({ analysisResult }) {
         })}
       </div>
 
-      {/* 분석 결과 헤더 */}
-      <div className="coaching-result-header">
-        <div className="section-title" style={{ color: 'var(--accent2)' }}>ANALYSIS RESULT</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '12px' }}>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '52px', color: '#fff', lineHeight: 1 }}>{fatigueNum}</div>
-          <div>
-            <div style={{ fontSize: '14px', color: fatigueColor, fontWeight: 700 }}>{fatigueLabel}</div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 300 }}>피로도 지수</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {[
-            { l: '다크서클', v: `${darkCircle}%`, c: fatigueColor },
-            { l: '수면점수',  v: `${sleepScore}`,  c: '#f59e0b' },
-            { l: `${planType}일 진행`, v: `${progressPct}%`, c: '#6ee7f7' },
-          ].map(i => (
-            <div key={i.l} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px 14px', flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>{i.l}</div>
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '22px', color: i.c }}>{i.v}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+
+      {/* 진행률 */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>{planType}일 진행</div>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '22px', color: '#6ee7f7' }}>{progressPct}%</div>
+        </div>
+      </div>
 
       {/* 오늘 미션 */}
       <div className="section-title">DAY {activeDay} 미션</div>
