@@ -15,7 +15,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # =====================================================
 SLEEP_TARGET_HOURS = 7.5
 SIGMA_HIGH = 3.0     # 5~7.5시간 (급격한 감소)
-SIGMA_LOW = 1.15     # 2~5시간 (매우 급격한 감소)
+SIGMA_LOW = 1.12     # 2~5시간 (매우 급격한 감소)
 SIGMA_EXCESS = 5.0   # 7.5시간 초과 (매우 완만)
 MID_POINT = 5.0      # 5시간 기준점
 
@@ -320,8 +320,39 @@ input_data = pd.DataFrame([{
 }])
 
 predicted_hours = round(float(model.predict(input_data)[0]), 1)
-sleep_score = get_asymmetric_sleep_score(predicted_hours)
 
+# 1. 근무 시간 가중치 함수 (과로 시 예측 수면 감소 - 비율)
+def apply_work_weight(predicted_hours, work_hours):
+    if work_hours > 10:
+        return predicted_hours * 0.85   # 15% 감소
+    elif work_hours > 8:
+        return predicted_hours * 0.9    # 10% 감소
+    return predicted_hours
+
+# 2. 폰 사용 시간 가중치 함수 (여유로울 때 폰 영향 반영 - 비율)
+def apply_phone_weight(predicted_hours, work_hours, phone_hours):
+    if work_hours <= 4:
+        if phone_hours <= 4:
+            return predicted_hours * 1.20   # 20% 증가
+        elif phone_hours > 4:
+            return predicted_hours * 1.15   # 15% 증가
+    return predicted_hours
+
+# 3. 추가: 근무 8시간 초과 + 폰 3시간 이상이면 가중치 확 낮춤
+def apply_work_phone_penalty(predicted_hours, work_hours, phone_hours):
+    if work_hours > 8 and phone_hours >= 3:
+        return predicted_hours * 0.80   # 20% 추가 감소
+    return predicted_hours
+
+# 가중치 순차 적용
+predicted_hours = apply_work_weight(predicted_hours, work_hours)
+predicted_hours = apply_phone_weight(predicted_hours, work_hours, phone)
+predicted_hours = apply_work_phone_penalty(predicted_hours, work_hours, phone)
+
+# 최종값 반올림
+predicted_hours = round(predicted_hours, 1)
+
+sleep_score = get_asymmetric_sleep_score(predicted_hours)
 
 # =====================================================
 # 13. 피로 원인 분석

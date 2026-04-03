@@ -4,7 +4,7 @@ from models_loader.loader import ml_model
 
 SLEEP_TARGET_HOURS = 7.5
 SIGMA_HIGH = 3.0     # 5~7.5시간
-SIGMA_LOW = 1.15     # 2~5시간
+SIGMA_LOW = 1.12    # 2~5시간
 SIGMA_EXCESS = 5.0   # 7.5시간 초과
 MID_POINT = 5.0
 
@@ -141,6 +141,28 @@ def predict_lifestyle(workout: float, phone: float, work_hours: float, caffeine:
     }])
 
     predicted_hours = round(float(ml_model.predict(input_data)[0]), 1)
+    
+    # ===== 가중치 적용 (여기부터 추가) =====
+    # 1. 근무 시간 가중치 (과로 시 감소)
+    if work_hours > 10:
+        predicted_hours = predicted_hours * 0.85
+    elif work_hours > 8:
+        predicted_hours = predicted_hours * 0.9
+    
+    # 2. 폰 사용 시간 가중치 (여유로울 때 증가)
+    if work_hours <= 4:
+        if phone <= 4:
+            predicted_hours = predicted_hours * 1.20
+        elif phone > 4:
+            predicted_hours = predicted_hours * 1.15
+    
+    # 3. 근무+폰 패널티 (과로 + 폰 많음)
+    if work_hours > 8 and phone >= 3:
+        predicted_hours = predicted_hours * 0.80
+    
+    predicted_hours = round(predicted_hours, 1)
+    # ===== 가중치 적용 끝 =====
+    
     sleep_score     = _get_asymmetric_sleep_score(predicted_hours)
     fatigue_cause   = _analyze_fatigue_cause_with_weight(workout, phone, work_hours, caffeine)
     fatigue_details = _analyze_fatigue_cause_detail(workout, phone, work_hours, caffeine)
