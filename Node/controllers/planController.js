@@ -1,7 +1,7 @@
 const planModel = require('../models/planModel');
 
 /**
- * [Member A - Backend] API 로직 컨트롤러
+ * [Member A - Backend] API 로직 컨트롤러 최종본
  */
 
 // 1. 플랜 시작하기
@@ -15,7 +15,27 @@ exports.startNewPlan = (req, res) => {
   });
 };
 
-// 2. 오늘의 미션 가져오기 (날짜 가드 로직 포함)
+// 2. 현재 사용자의 활성화된 플랜 정보 및 오늘 일차(Day N) 조회
+exports.getPlanStatus = (req, res) => {
+  const user_idx = req.user.id;
+
+  planModel.getActivePlanWithDay(user_idx, (err, results) => {
+    if (err) return res.status(500).json({ success: false, message: "플랜 상태 조회 실패" });
+    if (results.length === 0) return res.json({ success: false, hasActivePlan: false });
+
+    const plan = results[0];
+    res.json({
+      success: true,
+      hasActivePlan: true,
+      plan_idx: plan.plan_idx,
+      plan_type: plan.plan_type,
+      current_day_number: plan.current_day_number,
+      start_date: plan.start_date
+    });
+  });
+};
+
+// 3. 오늘의 미션 가져오기 (날짜 가드 로직 포함)
 exports.getDailyMissions = (req, res) => {
   const user_idx = req.user.id;
   const requestedDay = parseInt(req.params.day);
@@ -26,7 +46,7 @@ exports.getDailyMissions = (req, res) => {
     const plan = results[0];
     const currentDay = plan.current_day_number;
 
-    // [중요 가드 로직] 요청한 날짜가 오늘보다 미래라면 차단 (안건 4번)
+    // 가드 로직: 미래 일차 조회 시 차단
     if (requestedDay > currentDay) {
       return res.status(403).json({ 
         success: false, 
@@ -35,21 +55,19 @@ exports.getDailyMissions = (req, res) => {
       });
     }
 
-    // DB에서 해당 일차 미션 조회
     planModel.getMissionsByDay(plan.plan_idx, requestedDay, (err, missions) => {
       if (err) return res.status(500).json({ success: false, message: "미션 조회 실패" });
-      
       res.json({ 
         success: true, 
         day_number: requestedDay, 
-        current_day: currentDay, // 오늘이 몇 일차인지도 함께 전달
+        current_day: currentDay, 
         missions: missions 
       });
     });
   });
 };
 
-// 3. 미션 체크 상태 변경
+// 4. 미션 완료 체크 상태 변경
 exports.toggleMissionCheck = (req, res) => {
   const { detail_idx, is_completed } = req.body;
 
