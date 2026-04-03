@@ -122,19 +122,11 @@ function Coaching({ analysisResult }) {
           setGptSolutions(solutions || []);
           setGptAnalysis(comparison_analysis || "");
 
-        // [추가] 2. 받은 솔루션을 DB(tb_plan_detail)에 실제로 저장하기
-        await axios.post('http://localhost:7000/api/coaching/apply-optimization', {
-          user_idx: parseInt(userIdx),
-          solutions: solutions // AI가 만든 5개 문장 배열
-        }, { headers: { 'Authorization': token ? `Bearer ${token}` : '' } });
-        
-        console.log("✅ AI 솔루션이 DB에 동기화되었습니다.");
-
-        localStorage.setItem('last_gpt_coaching', JSON.stringify({
-            id: analysisId,
-            solutions,
-            analysis: comparison_analysis
-          }));
+          localStorage.setItem('last_gpt_coaching', JSON.stringify({
+              id: analysisId,
+              solutions,
+              analysis: comparison_analysis
+            }));
         }
       } catch (error) {
         console.error("GPT 코칭 로드 실패:", error);

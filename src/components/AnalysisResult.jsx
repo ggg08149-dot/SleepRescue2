@@ -233,7 +233,7 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     if (!planN) return;
     setPlanSaving(true);
     try {
-      if (userIdx) await startPlan(userIdx, planN);
+      await startPlan(planN);
     } catch (e) {
       console.error('플랜 저장 실패:', e);
     } finally {
