@@ -320,9 +320,6 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
               <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
                 스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
-                스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
-              </div>
               <button onClick={onSwitchToScan} className="scan-btn">📷 분석하러 가기</button>
             </div>
           )}

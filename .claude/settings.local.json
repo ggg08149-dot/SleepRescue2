@@ -14,7 +14,8 @@
       "Bash(grep -r plan C:UsersSMHRD-OneDriveDesktopSleepRescue2/Node --include=*.js)",
       "Bash(git add:*)",
       "Bash(python3:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(grep:*)"
     ]
   }
 }

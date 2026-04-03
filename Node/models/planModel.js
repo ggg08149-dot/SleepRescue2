@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 /**
- * [Member A - Backend] 지능형 통합 모델
+ * [Member A - Backend] 지능형 통합 모델 (원본 분석글 저장 기능 추가)
  */
 
 // 1. 새로운 플랜 시작
@@ -21,19 +21,27 @@ exports.getActivePlanWithDay = (user_idx, cb) => {
   db.query(sql, [user_idx], cb);
 };
 
-// 3. 미션 목록 조회 (is_ai_generated 필드 포함)
+// 3. 미션 목록 조회 (원본 분석글 daily_analysis 포함)
 exports.getMissionsByDay = (plan_idx, day_number, cb) => {
   const sql = `SELECT * FROM tb_plan_detail WHERE plan_idx = ? AND day_number = ?`;
   db.query(sql, [plan_idx, day_number], cb);
 };
 
-// 4. 미션 저장 (AI 여부 태깅 포함)
-exports.saveDailyMissions = (plan_idx, user_idx, day_number, missions, isAi, cb) => {
+// 4. 미션 저장 (원본 분석글 daily_analysis 저장 지원)
+exports.saveDailyMissions = (plan_idx, user_idx, day_number, missions, analysis, isAi, cb) => {
+  // 기존 데이터 삭제
   db.query('DELETE FROM tb_plan_detail WHERE plan_idx = ? AND day_number = ?', [plan_idx, day_number], (err) => {
     if (err) return cb(err);
+    
     const isAiVal = isAi ? 1 : 0;
-    const values = missions.map(task => [plan_idx, user_idx, day_number, task, 0, isAiVal]);
-    const insertSql = `INSERT INTO tb_plan_detail (plan_idx, user_idx, day_number, plan_task, is_completed, is_ai_generated) VALUES ?`;
+    // missions 배열을 순회하며 daily_analysis와 함께 저장
+    const values = missions.map(task => [plan_idx, user_idx, day_number, task, 0, isAiVal, analysis]);
+    
+    const insertSql = `
+      INSERT INTO tb_plan_detail 
+      (plan_idx, user_idx, day_number, plan_task, is_completed, is_ai_generated, daily_analysis) 
+      VALUES ?
+    `;
     db.query(insertSql, [values], cb);
   });
 };

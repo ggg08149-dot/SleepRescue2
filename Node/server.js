@@ -31,7 +31,7 @@ app.use('/api', lifelogRoutes);
 app.use('/api', fileRoutes);
 app.use('/api', darkcircleRoutes);
 app.use('/api', fatigueRoutes);
-app.use('/api', planRoutes);
+app.use('/api/plan', planRoutes);
 app.use('/api/coaching', coachingRoutes); // <--- 이 줄을 추가하세요!
 
 // ─── 서버 시작 ───────────────────────────────
