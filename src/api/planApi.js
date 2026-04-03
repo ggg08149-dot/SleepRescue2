@@ -2,16 +2,15 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:7000/api/plan';
 
-// 1. 플랜 시작하기 (AnalysisResult.jsx)
-export const startPlan = async (planType) => {
+// 1. 플랜 시작하기 (플랜 생성 + 1일차 미션 초기화)
+export const startPlan = async (userIdx, planType) => {
   const token = localStorage.getItem('token');
-  const response = await axios.post(`${API_URL}/start`, 
-    { plan_type: planType },
+  const response = await axios.post(`${API_URL}/save`,
+    { user_idx: userIdx, plan_type: planType },
     { headers: { 'Authorization': `Bearer ${token}` } }
   );
   return response.data;
 };
-
 
 // 2. 현재 플랜 상태 조회 (Coaching.jsx 로딩 시)
 // { plan_type, current_day_number, hasActivePlan } 등 반환
