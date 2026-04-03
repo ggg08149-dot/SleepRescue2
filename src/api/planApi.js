@@ -12,6 +12,7 @@ export const startPlan = async (planType) => {
   return response.data;
 };
 
+
 // 2. 현재 플랜 상태 조회 (Coaching.jsx 로딩 시)
 // { plan_type, current_day_number, hasActivePlan } 등 반환
 export const getPlanStatus = async () => {
