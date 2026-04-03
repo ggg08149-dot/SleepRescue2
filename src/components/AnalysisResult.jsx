@@ -314,8 +314,15 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
           ) : (
             <div style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--bg2)', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '14px' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: 'var(--accent)', marginBottom: '8px' }}>아직 분석 결과가 없어요</div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!</div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: 'var(--accent)', marginBottom: '8px' }}>
+                아직 분석 결과가 없어요
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
+                스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
+                스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
+              </div>
               <button onClick={onSwitchToScan} className="scan-btn">📷 분석하러 가기</button>
             </div>
           )}
