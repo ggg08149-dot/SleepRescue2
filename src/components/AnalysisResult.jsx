@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFatigueHistory, deleteFatigueRecord } from '../api/fatigueApi';
-import { startNewPlan } from '../api/planApi';
+import { startPlan } from '../api/planApi';
 
 const getFatigueMessage = (fatigue, userName, causeName) => {
   if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
@@ -233,7 +233,7 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     if (!planN) return;
     setPlanSaving(true);
     try {
-      if (userIdx) await startNewPlan(userIdx, planN);
+      if (userIdx) await startPlan(userIdx, planN);
     } catch (e) {
       console.error('플랜 저장 실패:', e);
     } finally {
