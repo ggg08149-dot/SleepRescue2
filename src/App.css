@@ -185,12 +185,25 @@ body { background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', s
 }
 .drink-btn.sel { background: rgba(110,231,247,0.1); border-color: rgba(110,231,247,0.4); color: var(--accent); }
 .analyze-btn {
-  width: 100%; background: linear-gradient(135deg, var(--accent), #4dd8ee);
-  color: #0b0b13; border: none; padding: 14px; border-radius: 12px;
-  font-family: 'Noto Sans KR', sans-serif; font-size: 14px; font-weight: 700;
-  cursor: pointer; transition: .2s;
+  width: 100%;
+  border: 2px solid #6ee7f7;
+  background: rgba(110, 231, 247, 0.25);
+  color: #6ee7f7;
+  padding: 14px;
+  border-radius: 12px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 16px rgba(110, 231, 247, 0.3), inset 0 0 20px rgba(110, 231, 247, 0.1);
 }
-.analyze-btn:hover { transform: translateY(-1px); opacity: .9; }
+.analyze-btn:hover {
+  background: rgba(110, 231, 247, 0.38);
+  box-shadow: 0 0 28px rgba(110, 231, 247, 0.5), inset 0 0 28px rgba(110, 231, 247, 0.2);
+}
+.analyze-btn:active { transform: scale(0.98); }
+.analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
 /* 코칭 화면 */
 .coaching-result-header {

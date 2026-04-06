@@ -7,12 +7,12 @@ import axios from 'axios';
 function Analyze({ backHome, updateResult, startCoaching, userName = '사용자', userIdx, existingResult }) {
   const [drinks, setDrinks]               = useState([]);
   const [lifestyleData, setLifestyleData] = useState({
-    workout  : '',
-    phone    : '',
-    workHours: '',
-    sleepTime: '',
+    workout  : '1.5',
+    phone    : '6',
+    workHours: '9',
+    sleepTime: '7.5',
   });
-  const [viewTab, setViewTab] = useState('scan'); // 'scan' | 'result'
+  const [viewTab, setViewTab] = useState('scan');
 
   const {
     scanned, scanning, analyzing,
@@ -21,52 +21,58 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
   } = useAnalyze();
 
   const webcamRef = useRef(null);
-
   const displayResult = result || existingResult;
 
   // ─── 카페인 계산 ──────────────────────────────
   const getTotalCaffeineMg = () => {
-    if (drinks.includes('🚫 없음')) return 0;
-    const caffeineMap = { '☕ 아메리카노': 120, '🧋 라떼': 80, '⚡ 에너지음료': 160, '🍵 녹차': 30 };
-    let total = 0;
-    drinks.forEach(drink => {
-      const match = drink.match(/([☕🧋⚡🍵].*?)\s*(\d+)잔/);
-      if (match) total += (caffeineMap[match[1]] || 0) * parseInt(match[2]);
-    });
-    return total;
+    if (drinks.includes('없음')) return 0;
+    const caffeineMap = { '아메리카노': 120, '라떼': 80, '에너지음료': 160, '녹차': 30 };
+    return drinks.reduce((sum, d) => sum + (caffeineMap[d] || 0), 0);
   };
 
-  // ─── 핸들러 ───────────────────────────────────
+  // ─── 스텝퍼 조절 ──────────────────────────────
+  const handleAdj = (field, delta, min, max) => {
+    setLifestyleData(prev => {
+      const cur = parseFloat(prev[field]) || 0;
+      const next = Math.round((cur + delta) * 10) / 10;
+      return { ...prev, [field]: String(Math.max(min, Math.min(max, next))) };
+    });
+  };
+
+  const handleInput = (field, val, min, max) => {
+    const n = parseFloat(val);
+    if (!isNaN(n)) {
+      setLifestyleData(prev => ({ ...prev, [field]: String(Math.max(min, Math.min(max, n))) }));
+    } else {
+      setLifestyleData(prev => ({ ...prev, [field]: val }));
+    }
+  };
+
+  // ─── 분석 핸들러 ──────────────────────────────
   const handleScan = () => doScan(webcamRef);
 
   const handleAnalyze = () => {
     doAnalyze(lifestyleData, getTotalCaffeineMg, async (res) => {
       updateResult(res);
       setViewTab('result');
-
-      // 🚀 [재측정 결과 기반 플랜 최적화 로직]
       try {
         const token = localStorage.getItem('token');
-        const gptRes = await axios.post('http://localhost:7000/api/coaching/analyze', 
+        const gptRes = await axios.post('http://localhost:7000/api/coaching/analyze',
           { user_idx: userIdx },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
-
         const { is_critical, delta_score, solutions } = gptRes.data;
-
-        // 사용자 지시 문구 적용: "재측정 결과로 현재 플랜의 미션을 최적화 할까요?"
         if (is_critical) {
           const confirmOptimization = window.confirm(
             `⚠️ 상태 변화 감지 (차이: ${delta_score}점)\n\n재측정 결과로 현재 플랜의 미션을 최적화 할까요?\n\n[확인]을 누르시면 오늘 남은 미션이 현재 상태에 맞춰 재설정됩니다.`
           );
-
           if (confirmOptimization) {
             await axios.post('http://localhost:7000/api/coaching/apply-optimization',
-              { user_idx: userIdx, solutions: solutions },
+              { user_idx: userIdx, solutions },
               { headers: { 'Authorization': `Bearer ${token}` } }
             );
             alert("✅ 오늘의 미션이 최적화되었습니다. 코칭 탭에서 확인하세요!");
-            localStorage.removeItem('last_gpt_coaching'); // 캐시 초기화하여 즉시 반영
+            localStorage.removeItem('last_gpt_coaching');
           }
         }
       } catch (err) {
@@ -75,39 +81,32 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     });
   };
 
-
-  // ─── 음료 관련 ────────────────────────────────
-  const addDrink = (drinkName) => {
-    if (drinkName === '🚫 없음') { setDrinks(['🚫 없음']); return; }
+  // ─── 카페인 토글 ──────────────────────────────
+  const toggleDrink = (name) => {
+    if (name === '없음') {
+      setDrinks(prev => prev.includes('없음') ? [] : ['없음']);
+      return;
+    }
     setDrinks(prev => {
-      let nd = prev.filter(d => d !== '🚫 없음');
-      const idx = nd.findIndex(d => d.includes(drinkName));
-      if (idx !== -1) {
-        const cnt = (nd[idx].match(/(\d+)잔/)?.[1] ? parseInt(nd[idx].match(/(\d+)잔/)[1]) : 1) + 1;
-        nd[idx] = `${drinkName} ${cnt}잔`;
-      } else {
-        nd.push(`${drinkName} 1잔`);
-      }
-      return nd;
+      const without = prev.filter(d => d !== '없음');
+      return without.includes(name) ? without.filter(d => d !== name) : [...without, name];
     });
   };
 
-  const removeDrink = (drinkName) => {
-    setDrinks(prev => {
-      if (prev.includes('🚫 없음')) return prev;
-      const idx = prev.findIndex(d => d.includes(drinkName));
-      if (idx !== -1) {
-        const cnt = prev[idx].match(/(\d+)잔/)?.[1] ? parseInt(prev[idx].match(/(\d+)잔/)[1]) : 1;
-        if (cnt > 1) { const nd = [...prev]; nd[idx] = `${drinkName} ${cnt - 1}잔`; return nd; }
-        return prev.filter((_, i) => i !== idx);
-      }
-      return prev;
-    });
-  };
+  const drinkList = [
+    { name: '아메리카노', icon: '☕' },
+    { name: '라떼',       icon: '🧋' },
+    { name: '에너지음료', icon: '⚡' },
+    { name: '녹차',       icon: '🍵' },
+    { name: '없음',       icon: '🚫' },
+  ];
 
-  const getDrinkCount  = (d) => { if (drinks.includes('🚫 없음')) return 0; const f = drinks.find(x => x.includes(d)); if (!f) return 0; return parseInt(f.match(/(\d+)잔/)?.[1] || '1'); };
-  const isNoneSelected = () => drinks.includes('🚫 없음');
-  const drinkList = ['☕ 아메리카노', '🧋 라떼', '⚡ 에너지음료', '🍵 녹차', '🚫 없음'];
+  const fields = [
+    { key: 'workout',   label: '운동시간',    icon: '🏃', min: 0, max: 12, step: 0.5 },
+    { key: 'workHours', label: '근무시간',    icon: '💼', min: 0, max: 16, step: 0.5 },
+    { key: 'phone',     label: '휴대폰 사용', icon: '📱', min: 0, max: 16, step: 0.5 },
+    { key: 'sleepTime', label: '수면시간',    icon: '😴', min: 0, max: 12, step: 0.5 },
+  ];
 
   return (
     <div className="analyze-screen">
@@ -120,9 +119,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           border: `1px solid ${viewTab === 'scan' ? 'rgba(110,231,247,0.5)' : 'var(--border)'}`,
           background: viewTab === 'scan' ? 'rgba(110,231,247,0.12)' : 'var(--bg2)',
           color: viewTab === 'scan' ? 'var(--accent)' : 'var(--muted)',
-        }}>
-          📷 다크서클 스캔
-        </button>
+        }}>📷 다크서클 스캔</button>
         <button onClick={() => setViewTab('result')} style={{
           flex: 1, padding: '10px', borderRadius: '12px',
           fontFamily: "'Noto Sans KR', sans-serif", fontSize: '13px', cursor: 'pointer',
@@ -132,9 +129,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
         }}>
           📊 분석 결과
           {displayResult && (
-            <span style={{ marginLeft: '6px', background: 'rgba(167,139,250,0.3)', border: '1px solid rgba(167,139,250,0.5)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent2)' }}>
-              NEW
-            </span>
+            <span style={{ marginLeft: '6px', background: 'rgba(167,139,250,0.3)', border: '1px solid rgba(167,139,250,0.5)', borderRadius: '20px', padding: '1px 8px', fontSize: '10px', color: 'var(--accent2)' }}>NEW</span>
           )}
         </button>
       </div>
@@ -142,7 +137,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
       {/* ─── 스캔 탭 ─── */}
       {viewTab === 'scan' && (
         <>
-          {/* 웹캠 영역 */}
           <div className="cam-box-big">
             {!scanned && !scanning && (
               <div style={{ textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(110,231,247,0.1)', borderRadius: '8px', border: '1px solid rgba(110,231,247,0.3)' }}>
@@ -152,7 +146,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                 </p>
               </div>
             )}
-
             <div className="cam-preview" style={{ position: 'relative', overflow: 'hidden', background: '#000', borderRadius: '12px' }}>
               {!scanned && !scanning && (
                 <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -177,19 +170,16 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                   </div>
                 </div>
               )}
-
               {scanning && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', zIndex: 10 }}>
                   <div style={{ fontSize: '40px' }}>👁</div>
                   <div style={{ fontSize: '14px', color: '#6ee7f7', marginTop: '10px' }}>AI가 다크서클을 분석하고 있습니다...</div>
                 </div>
               )}
-
               {scanned && analyzedImg && (
                 <img src={analyzedImg} alt="분석 결과" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               )}
             </div>
-
             <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
               {!scanned ? (
                 <button className="scan-btn" onClick={handleScan} disabled={scanning}>
@@ -199,7 +189,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
                 <button onClick={() => resetScan()} className="retry-btn">↺ 다시 촬영하기</button>
               )}
             </div>
-
             {scanned && (
               <div style={{ color: 'var(--accent)', fontWeight: 'bold', marginTop: '10px' }}>
                 눈가 컨디션: {darkScore}점
@@ -207,87 +196,111 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
             )}
           </div>
 
-          {/* 생활 패턴 입력 */}
+          {/* ✅ 생활 패턴 입력 */}
           <div className="section-title">생활 패턴 입력</div>
           <div className="input-card">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div className="input-row" style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
-                <div className="input-group">
-                  <div className="input-label">운동시간 (h)</div>
-                  <input className="input-field" type="number" step="0.5" placeholder="1.5"
-                    value={lifestyleData.workout} onChange={e => setLifestyleData({...lifestyleData, workout: e.target.value})} />
-                </div>
-                <div className="input-group">
-                  <div className="input-label">근무시간 (h)</div>
-                  <input className="input-field" type="number" placeholder="9"
-                    value={lifestyleData.workHours} onChange={e => setLifestyleData({...lifestyleData, workHours: e.target.value})} />
-                </div>
-              </div>
-              <div className="input-row" style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
-                <div className="input-group">
-                  <div className="input-label">휴대폰 사용시간 (h)</div>
-                  <input className="input-field" type="number" placeholder="6"
-                    value={lifestyleData.phone} onChange={e => setLifestyleData({...lifestyleData, phone: e.target.value})} />
-                </div>
-                <div className="input-group">
-                  <div className="input-label">수면시간 (h)</div>
-                  <input className="input-field" type="number" step="0.5" placeholder="7.5"
-                    value={lifestyleData.sleepTime} onChange={e => setLifestyleData({...lifestyleData, sleepTime: e.target.value})} />
-                </div>
-              </div>
 
-              <div className="input-group">
-                <div className="input-label">카페인 섭취량</div>
-                <div className="drink-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px', marginBottom: '12px' }}>
-                  {drinkList.map(drink => {
-                    const count = getDrinkCount(drink);
-                    const isNone = drink === '🚫 없음';
-                    const isSelected = isNone ? isNoneSelected() : count > 0;
-                    if (isNone) {
-                      return (
-                        <div key={drink} style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'center' }}>
-                          <button onClick={() => isNoneSelected() ? setDrinks([]) : setDrinks(['🚫 없음'])}
-                            style={{ padding: '10px 16px', borderRadius: '24px', background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.08)', color: isSelected ? '#000' : 'rgba(255,255,255,0.7)', border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '13px', fontWeight: 500, minWidth: '120px' }}>
-                            {drink}
-                          </button>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={drink} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <button onClick={() => addDrink(drink)} disabled={isNoneSelected()}
-                          style={{ padding: '10px 16px', borderRadius: '24px', background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.08)', color: isSelected ? '#000' : 'rgba(255,255,255,0.7)', border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)', cursor: isNoneSelected() ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 500, minWidth: '100px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', opacity: isNoneSelected() ? 0.5 : 1 }}>
-                          <span>{drink}</span>
-                          {count > 0 && <span style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '20px', fontSize: '12px' }}>{count}잔</span>}
-                        </button>
-                        {count > 0 && !isNoneSelected() && (
-                          <button onClick={() => removeDrink(drink)}
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            -
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+            {/* ✅ 스텝퍼 그리드 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              {fields.map(({ key, label, icon, min, max, step }) => (
+                <div key={key} style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '12px', padding: '14px 12px',
+                  display: 'flex', flexDirection: 'column', gap: '10px',
+                }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span>{icon}</span>{label}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                    <div
+                      onClick={() => handleAdj(key, -step, min, max)}
+                      style={{ width: '28px', height: '28px', flexShrink: 0, borderRadius: '50%', border: '1px solid rgba(110,231,247,0.25)', background: 'rgba(110,231,247,0.06)', color: '#6ee7f7', fontSize: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    >−</div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                      <input
+                        type="number"
+                        min={min} max={max} step={step}
+                        value={lifestyleData[key]}
+                        onChange={e => handleInput(key, e.target.value, min, max)}
+                        onFocus={e => e.target.style.borderBottomColor = '#6ee7f7'}
+                        onBlur={e => e.target.style.borderBottomColor = 'rgba(110,231,247,0.2)'}
+                        style={{
+                          width: '100%', background: 'transparent', border: 'none',
+                          borderBottom: '1px solid rgba(110,231,247,0.2)',
+                          color: '#fff', fontSize: '20px', fontWeight: 600,
+                          textAlign: 'center', outline: 'none', padding: '2px 0 4px',
+                          fontFamily: "'Noto Sans KR', sans-serif",
+                          MozAppearance: 'textfield',
+                        }}
+                      />
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>시간</span>
+                    </div>
+                    <div
+                      onClick={() => handleAdj(key, step, min, max)}
+                      style={{ width: '28px', height: '28px', flexShrink: 0, borderRadius: '50%', border: '1px solid rgba(110,231,247,0.25)', background: 'rgba(110,231,247,0.06)', color: '#6ee7f7', fontSize: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    >+</div>
+                  </div>
                 </div>
-                {!isNoneSelected() && drinks.length > 0 && (
-                  <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(110,231,247,0.1)', borderRadius: '8px', fontSize: '12px', color: '#6ee7f7' }}>
-                    📊 총 카페인: {getTotalCaffeineMg()}mg
-                  </div>
-                )}
-                {isNoneSelected() && (
-                  <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(110,231,247,0.1)', borderRadius: '8px', fontSize: '12px', color: '#6ee7f7' }}>
-                    ✅ 카페인 없음 (0mg)
-                  </div>
-                )}
-              </div>
-
-              <button className="analyze-btn" onClick={handleAnalyze} disabled={analyzing}>
-                {analyzing ? '⏳ 분석 중...' : '🔍 AI 분석 시작하기'}
-              </button>
+              ))}
             </div>
-          </div>
 
+            {/* ✅ 카페인 섭취량 */}
+            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0 0 14px' }} />
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              ☕ 카페인 섭취량
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+              {drinkList.map(({ name, icon }) => {
+                const isOn = drinks.includes(name);
+                return (
+                  <button
+                    key={name}
+                    onClick={() => toggleDrink(name)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '8px 14px', borderRadius: '10px',
+                      border: isOn ? '1px solid rgba(110,231,247,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                      background: isOn ? 'rgba(110,231,247,0.1)' : 'rgba(255,255,255,0.03)',
+                      color: isOn ? '#6ee7f7' : 'rgba(255,255,255,0.45)',
+                      fontSize: '12px', cursor: 'pointer',
+                      fontFamily: "'Noto Sans KR', sans-serif",
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: '15px' }}>{icon}</span>{name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 카페인 합계 */}
+            {drinks.length > 0 && (
+              <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(110,231,247,0.08)', borderRadius: '8px', fontSize: '12px', color: '#6ee7f7', border: '1px solid rgba(110,231,247,0.15)' }}>
+                {drinks.includes('없음') ? '✅ 카페인 없음 (0mg)' : `📊 총 카페인: ${getTotalCaffeineMg()}mg`}
+              </div>
+            )}
+
+            {/* ✅ AI 분석 버튼 */}
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              style={{
+                width: '100%', marginTop: '16px', padding: '14px',
+                borderRadius: '12px', border: '2px solid #6ee7f7',
+                background: analyzing ? 'rgba(110,231,247,0.04)' : 'rgba(110,231,247,0.25)',
+                color: '#6ee7f7', fontSize: '14px', fontWeight: 700,
+                cursor: analyzing ? 'not-allowed' : 'pointer',
+                fontFamily: "'Noto Sans KR', sans-serif", letterSpacing: '0.03em',
+                opacity: analyzing ? 0.5 : 1, transition: 'background 0.2s, box-shadow 0.2s',
+                boxShadow: analyzing ? 'none' : '0 0 16px rgba(110,231,247,0.3), inset 0 0 20px rgba(110,231,247,0.1)',
+              }}
+              onMouseEnter={e => { if (!analyzing) { e.currentTarget.style.background = 'rgba(110,231,247,0.38)'; e.currentTarget.style.boxShadow = '0 0 28px rgba(110,231,247,0.5), inset 0 0 28px rgba(110,231,247,0.2)'; }}}
+              onMouseLeave={e => { if (!analyzing) { e.currentTarget.style.background = 'rgba(110,231,247,0.25)'; e.currentTarget.style.boxShadow = '0 0 16px rgba(110,231,247,0.3), inset 0 0 20px rgba(110,231,247,0.1)'; }}}
+            >
+              {analyzing ? '⏳ 분석 중...' : '🔍 AI 분석 시작하기'}
+            </button>
+          </div>
         </>
       )}
 
