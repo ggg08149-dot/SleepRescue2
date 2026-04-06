@@ -130,7 +130,7 @@ def build_grounding_context(today: dict, yesterday) -> tuple:
             f"  카페인    : {d.get('caffeine', '미입력')}mg\n"
             f"  스마트폰  : {d.get('phone_hours', '미입력')}시간\n"
             f"  근무시간  : {d.get('work_hours', '미입력')}시간\n"
-            f"  스트레스  : {d.get('stress_level', '미입력')}/10\n"
+            # f"  스트레스  : {d.get('stress_level', '')}\n"
             f"  피로 원인 : {d.get('fatigue_reason', '미입력')}\n"
         )
 
