@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getLatestFatigue } from '../api/fatigueApi';
 import { startPlan } from '../api/planApi';
+import { getPlanStatus } from '../api/planApi';
 
 const dbRowToResult = (row) => ({
   fatigue      : row.fatigue_level,
@@ -36,7 +37,16 @@ const PLAN_DATA = [
 ];
 
 // ─── 결과 카드 ────────────────────────────────────
-export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching, planSaving = false }) {
+export function ResultCard({
+  result,
+  userName,
+  selectedPlan,
+  onSelectPlan,
+  onStartCoaching,
+  planSaving = false,
+  isPlanActive,
+  activePlanType
+}) {
   if (!result) return null;
   const lv = FATIGUE_LEVELS.find(l => l.key === result.fatigue) || FATIGUE_LEVELS[0];
   const { emoji, color: emojiColor } = getFatigueEmoji(result.fatigue);
@@ -172,26 +182,59 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
       </div>
 
       {/* 플랜 선택 */}
-      <div className="section-title">추천 수면 코칭 플랜</div>
-      <div className="plan-grid">
-        {PLAN_DATA.map(p => (
-          <div key={p.n} className="plan-btn"
-            onClick={() => onSelectPlan(p.n)}
-            style={selectedPlan === p.n ? { borderColor: 'var(--accent)', background: 'rgba(110,231,247,0.1)' } : {}}
-          >
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '28px', color: 'var(--accent)', lineHeight: 1, marginBottom: '2px' }}>{p.days}</div>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>{p.label}</div>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{p.desc}</div>
+      {isPlanActive ? (
+        <div style={{
+          marginTop: '16px',
+          padding: '20px',
+          borderRadius: '14px',
+          background: 'rgba(124,58,237,0.12)',
+          border: '1px solid rgba(167,139,250,0.4)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>
+            🚀 진행 중인 플랜
           </div>
-        ))}
-      </div>
-      {selectedPlan && (
-        <button className="analyze-btn" onClick={onStartCoaching}
-          style={{ background: planSaving ? 'rgba(124,58,237,0.5)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)', marginTop: '8px', fontSize: '15px', fontWeight: 700 }}
-          disabled={planSaving}>
-          {planSaving ? '⏳ 저장 중...' : `🚀 ${selectedPlan}일 플랜 진행하기`}
-        </button>
+          <div style={{ fontSize: '14px', color: '#ddd', marginBottom: '12px' }}>
+            이미 <strong>{activePlanType}일 플랜</strong>을 진행 중입니다.<br/>
+            코칭 탭에서 미션을 계속 수행해보세요!
+          </div>
+          <button
+            className="analyze-btn"
+            onClick={onStartCoaching}
+            style={{ fontSize: '14px' }}
+          >
+            📋 코칭 탭으로 이동
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="section-title">추천 수면 코칭 플랜</div>
+
+          <div className="plan-grid">
+            {PLAN_DATA.map(p => (
+              <div key={p.n} className="plan-btn"
+                onClick={() => onSelectPlan(p.n)}
+                style={selectedPlan === p.n ? { borderColor: 'var(--accent)', background: 'rgba(110,231,247,0.1)' } : {}}
+              >
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '28px', color: 'var(--accent)' }}>
+                  {p.days}
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>{p.label}</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', whiteSpace: 'pre-line' }}>
+                  {p.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {!isPlanActive && selectedPlan && (
+            <button className="analyze-btn" onClick={onStartCoaching} disabled={planSaving}>
+              {planSaving ? '⏳ 저장 중...' : `🚀 ${selectedPlan}일 플랜 진행하기`}
+            </button>
+          )}
+        </>
       )}
+
       {!selectedPlan && (
         <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted)', marginTop: '8px', padding: '8px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.12)' }}>
           플랜을 선택하면 진행하기 버튼이 활성화됩니다
@@ -207,13 +250,37 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
   const [planSaving, setPlanSaving]     = useState(false);
   const [latestFromDB, setLatestFromDB] = useState(null);
 
+  const [isPlanActive, setIsPlanActive] = useState(false);
+  const [activePlanType, setActivePlanType] = useState(null);
+
   useEffect(() => {
-    const user_idx = localStorage.getItem('user_idx');
-    if (!user_idx || currentResult || existingResult) return;
-    getLatestFatigue(user_idx)
-      .then(res => { if (res.success && res.data) setLatestFromDB(dbRowToResult(res.data)); })
-      .catch(() => {});
-  }, [currentResult, existingResult]);
+    const checkPlanStatus = async () => {
+      try {
+        const data = await getPlanStatus();
+        if (!data || !data.start_date || !data.plan_type) return;
+
+        const start = new Date(data.start_date);
+        const today = new Date();
+
+        start.setHours(0,0,0,0);
+        today.setHours(0,0,0,0);
+
+        const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
+
+        if (diff >= 1 && diff <= data.plan_type) {
+          setIsPlanActive(true);
+          setActivePlanType(data.plan_type);
+        } else {
+          setIsPlanActive(false);
+        }
+
+      } catch (err) {
+        console.error('플랜 상태 확인 실패:', err);
+      }
+    };
+
+    checkPlanStatus();
+  }, []);
 
   const displayResult = currentResult || existingResult || latestFromDB;
 
@@ -233,6 +300,10 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
     setPlanSaving(true);
     try {
       await startPlan(planN);
+
+      // 🔥 이거 추가
+      setIsPlanActive(true);
+      setActivePlanType(planN);
     } catch (e) {
       console.error('플랜 저장 실패:', e);
     } finally {
@@ -250,8 +321,16 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
               📅 {dateLabel}
             </div>
           )}
-          <ResultCard result={displayResult} userName={userName} selectedPlan={selectedPlan}
-            onSelectPlan={setSelectedPlan} onStartCoaching={() => handleStartCoaching(selectedPlan)} planSaving={planSaving} />
+            <ResultCard
+              result={displayResult}
+              userName={userName}
+              selectedPlan={selectedPlan}
+              onSelectPlan={setSelectedPlan}
+              onStartCoaching={() => handleStartCoaching(activePlanType || selectedPlan)}
+              planSaving={planSaving}
+              isPlanActive={isPlanActive}
+              activePlanType={activePlanType}
+            />
         </>
       ) : (
         <div style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--bg2)', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '14px' }}>

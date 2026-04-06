@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPlanStatus, getDailyMissions, updateMissionCheck } from '../api/planApi';
 
+const getCurrentDayFromStart = (startDate) => {
+  if (!startDate) return 1;
+
+  const start = new Date(startDate);
+  const today = new Date();
+
+  start.setHours(0,0,0,0);
+  today.setHours(0,0,0,0);
+
+  const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  return diff + 1;
+};
+
 /**
  * 코칭 플랜 데이터 훅 (원본 분석글 dailyAnalysis 추가)
  */
@@ -18,10 +31,18 @@ export function useCoaching() {
     setLoadingPlan(true);
     getPlanStatus()
       .then(data => {
-        setPlanStatus(data);
-        if (data?.current_day_number) {
-          setActiveDay(data.current_day_number);
-        }
+        if (!data) return;
+
+        // ✅ current_day 직접 계산
+        const computedDay = getCurrentDayFromStart(data.start_date);
+
+        const updated = {
+          ...data,
+          current_day_number: Math.min(computedDay, data.plan_type) // max 제한
+        };
+
+        setPlanStatus(updated);
+        setActiveDay(updated.current_day_number);
       })
       .catch(err => {
         console.error('플랜 상태 로드 실패:', err);
@@ -34,9 +55,19 @@ export function useCoaching() {
     if (!planStatus) return;
 
     setLoadingMissions(true);
-    setIsLocked(false);
     setMissions([]);
     setDailyAnalysis("");
+
+    const isFuture = activeDay > planStatus.current_day_number;
+
+    // ✅ 프론트에서 lock 처리
+    if (isFuture) {
+      setIsLocked(true);
+      setLoadingMissions(false);
+      return;
+    }
+
+    setIsLocked(false);
 
     getDailyMissions(activeDay)
       .then(data => {
@@ -46,11 +77,7 @@ export function useCoaching() {
         }
       })
       .catch(err => {
-        if (err.response?.status === 403 && err.response?.data?.isLocked) {
-          setIsLocked(true);
-        } else {
-          console.error('미션 로드 실패:', err);
-        }
+        console.error('미션 로드 실패:', err);
       })
       .finally(() => setLoadingMissions(false));
   }, [activeDay, planStatus]);
