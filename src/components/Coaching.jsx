@@ -212,6 +212,7 @@ function Coaching({ analysisResult }) {
   const useBackendMissions = missions && missions.length > 0;
 
   // ✅ 진행률 계산 분기
+  // ✅ 오늘 기준
   const totalMissions = useBackendMissions
     ? missions.length
     : gptSolutions.length;
@@ -220,7 +221,24 @@ function Coaching({ analysisResult }) {
     ? missions.filter(m => m.is_completed).length
     : gptSolutions.filter((_, i) => !!gptChecked[i]).length;
 
-  const progressPct = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
+
+  // ✅ 전체 플랜 기준
+  const missionPerDay = useBackendMissions
+    ? missions.length || 5
+    : gptSolutions.length || 5;
+
+  const totalPlanCount = planType * missionPerDay;
+
+  let totalDone = 0;
+
+  for (let d = 1; d <= currentDayNum; d++) {
+    const dayState = loadCheckedState(planType, d);
+    totalDone += Object.values(dayState).filter(Boolean).length;
+  }
+
+  const progressPct = totalPlanCount > 0
+    ? Math.round((totalDone / totalPlanCount) * 100)
+    : 0;
 
   // ✅ 전체 플랜 진행률 (모든 날 합산) - 현재 날까지만
   const totalPlanMissions  = totalMissions * currentDayNum;
