@@ -3,10 +3,9 @@ const planModel = require('../models/planModel');
 const coachingModel = require('../models/coachingModel');
 
 /**
- * [Member A - Backend] 지능형 통합 시작 및 자체 복구 엔진
+ * [Member A - Backend] 지능형 통합 시작 및 원본 데이터 보존 엔진
  */
 
-// 표준 권장 미션 (AI 장애 시 Fallback용)
 const FALLBACK_MISSIONS = [
   "오후 2시 이후 카페인 섭취 완전 차단하기",
   "취침 1시간 전 스마트폰 전원 종료하기",
@@ -15,85 +14,78 @@ const FALLBACK_MISSIONS = [
   "잠들기 전 4-7-8 호흡법 3회 반복하기"
 ];
 
-// 1. 플랜 시작하기 (통합 로직)
+const FALLBACK_ANALYSIS = "현재 AI 서버와의 연결이 원활하지 않아 수면 구조대의 표준 가이드를 제공해 드립니다. 오늘 밤은 기본에 충실한 수면 습관으로 피로를 관리해 보세요!";
+
+// 1. 플랜 시작하기
 exports.startNewPlan = (req, res) => {
   const { plan_type } = req.body;
   const user_idx = req.user.id;
 
-  // 1. 플랜 레코드 생성
   planModel.createPlan(user_idx, plan_type, async (err, result) => {
     if (err) return res.status(500).json({ success: false, message: "플랜 시작 실패" });
     const plan_idx = result.insertId;
 
-    // 2. AI 분석 시도
     coachingModel.getComparisonData(user_idx, async (err2, rows) => {
       let solutions = FALLBACK_MISSIONS;
+      let analysis = FALLBACK_ANALYSIS;
       let isAi = false;
 
       if (!err2 && rows && rows.length > 0) {
         try {
-          const pythonResponse = await axios.post('http://localhost:8000/coaching', {
+          const pyRes = await axios.post('http://localhost:8000/coaching', {
             user_idx,
             today: rows[0],
             yesterday: rows.length > 1 ? rows[1] : null
-          }, { timeout: 5000 }); // 5초 타임아웃
+          }, { timeout: 7000 });
           
-          if (pythonResponse.data.solutions) {
-            solutions = pythonResponse.data.solutions;
+          if (pyRes.data.solutions) {
+            solutions = pyRes.data.solutions;
+            analysis = pyRes.data.analysis; // GPT의 원본 분석글 추출
             isAi = true;
           }
         } catch (aiErr) {
-          console.warn("⚠️ AI 서버 장애로 표준 미션을 제공합니다.");
+          console.warn("⚠️ AI 서버 장애로 표준 가이드를 제공합니다.");
         }
       }
 
-      // 3. 1일차 미션 저장
-      planModel.saveDailyMissions(plan_idx, user_idx, 1, solutions, isAi, (err3) => {
-        res.json({ success: true, message: isAi ? "AI 맞춤 코칭이 시작되었습니다!" : "표준 수면 케어 코칭이 시작되었습니다." });
+      // 1일차 데이터 저장 (원본 분석글 포함)
+      planModel.saveDailyMissions(plan_idx, user_idx, 1, solutions, analysis, isAi, (err3) => {
+        res.json({ success: true, message: "코칭 플랜이 시작되었습니다!" });
       });
     });
   });
 };
 
-// 2. 오늘의 미션 가져오기 (지능형 복구 로직 포함)
+// 2. 오늘의 미션 및 원본 분석글 가져오기
 exports.getDailyMissions = (req, res) => {
   const user_idx = req.user.id;
   const requestedDay = parseInt(req.params.day);
 
   planModel.getActivePlanWithDay(user_idx, (err, results) => {
-    if (err || results.length === 0) return res.status(404).json({ success: false, message: "플랜 정보 없음" });
+    if (err || results.length === 0) return res.status(404).json({ success: false, message: "플랜 없음" });
 
     const plan = results[0];
     if (requestedDay > plan.current_day_number) {
       return res.status(403).json({ success: false, isLocked: true });
     }
 
-    planModel.getMissionsByDay(plan.plan_idx, requestedDay, async (err2, missions) => {
-      // [지능형 자체 복구] 기본 미션이고, 수행한 게 하나도 없다면 AI 업그레이드 시도
-      const needsUpgrade = missions.length > 0 && missions[0].is_ai_generated === 0 && missions.every(m => m.is_completed === 0);
+    planModel.getMissionsByDay(plan.plan_idx, requestedDay, (err2, missions) => {
+      if (err2 || missions.length === 0) return res.json({ success: false, message: "미션 없음" });
 
-      if (needsUpgrade) {
-        coachingModel.getComparisonData(user_idx, async (err3, rows) => {
-          if (!err3 && rows && rows.length > 0) {
-            try {
-              const pyRes = await axios.post('http://localhost:8000/coaching', { user_idx, today: rows[0], yesterday: rows[1] }, { timeout: 3000 });
-              if (pyRes.data.solutions) {
-                // 새로운 AI 미션으로 교체
-                planModel.saveDailyMissions(plan.plan_idx, user_idx, requestedDay, pyRes.data.solutions, true, () => {
-                  // 교체된 미션 다시 조회하여 반환
-                  planModel.getMissionsByDay(plan.plan_idx, requestedDay, (err4, newMissions) => {
-                    res.json({ success: true, day_number: requestedDay, missions: newMissions, upgraded: true });
-                  });
-                });
-                return;
-              }
-            } catch (e) { /* 무시하고 기존 미션 반환 */ }
-          }
-          res.json({ success: true, day_number: requestedDay, missions });
-        });
-      } else {
-        res.json({ success: true, day_number: requestedDay, missions });
-      }
+      // daily_analysis는 모든 행에 동일하게 저장되어 있으므로 첫 번째 행에서 추출
+      const dailyAnalysis = missions[0].daily_analysis || "";
+      
+      const typedMissions = missions.map((m, i) => ({
+        ...m,
+        type: i < 3 ? '필수' : i === 3 ? '선택' : '권장',
+      }));
+
+      res.json({ 
+        success: true, 
+        day_number: requestedDay, 
+        missions: typedMissions,
+        daily_analysis: dailyAnalysis // 프론트엔드 상단 카드용 원본 데이터
+      });
     });
   });
 };

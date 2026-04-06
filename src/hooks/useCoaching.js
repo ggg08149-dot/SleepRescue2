@@ -2,27 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { getPlanStatus, getDailyMissions, updateMissionCheck } from '../api/planApi';
 
 /**
- * 코칭 플랜 데이터 훅
- * - 서버에서 플랜 상태(plan_type, current_day_number) 로드
- * - 선택한 날짜의 미션 목록 로드
- * - 체크박스: 낙관적 업데이트(즉시 반영) → DB 동기화
+ * 코칭 플랜 데이터 훅 (원본 분석글 dailyAnalysis 추가)
  */
 export function useCoaching() {
-  const [planStatus, setPlanStatus] = useState(null); // { plan_type, current_day_number }
+  const [planStatus, setPlanStatus] = useState(null); 
   const [activeDay, setActiveDay] = useState(1);
   const [missions, setMissions] = useState([]);
+  const [dailyAnalysis, setDailyAnalysis] = useState(""); // 원본 분석글 상태 추가
   const [isLocked, setIsLocked] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [loadingMissions, setLoadingMissions] = useState(false);
 
-  // 플랜 상태 로드 (마운트 시 1회)
+  // 플랜 상태 로드
   useEffect(() => {
-    const userIdx = localStorage.getItem('user_idx') || '1008';
     setLoadingPlan(true);
-    getPlanStatus(userIdx)
+    getPlanStatus()
       .then(data => {
         setPlanStatus(data);
-        // 오늘 날짜로 초기 탭 설정
         if (data?.current_day_number) {
           setActiveDay(data.current_day_number);
         }
@@ -33,18 +29,21 @@ export function useCoaching() {
       .finally(() => setLoadingPlan(false));
   }, []);
 
-  // 날짜 변경 시 미션 로드
+  // 날짜 변경 시 미션 + 원본 분석글 로드
   useEffect(() => {
     if (!planStatus) return;
 
-    const userIdx = localStorage.getItem('user_idx') || '1008';
     setLoadingMissions(true);
     setIsLocked(false);
     setMissions([]);
+    setDailyAnalysis("");
 
-    getDailyMissions(userIdx, activeDay)
+    getDailyMissions(activeDay)
       .then(data => {
-        setMissions(data.missions || []);
+        if (data.success) {
+          setMissions(data.missions || []);
+          setDailyAnalysis(data.daily_analysis || ""); // 서버에서 받은 원본 글 저장
+        }
       })
       .catch(err => {
         if (err.response?.status === 403 && err.response?.data?.isLocked) {
@@ -56,21 +55,14 @@ export function useCoaching() {
       .finally(() => setLoadingMissions(false));
   }, [activeDay, planStatus]);
 
-  // 체크박스 토글: 낙관적 업데이트 후 DB 동기화
   const toggleCheck = useCallback(async (detailIdx, currentIsCompleted) => {
     const newVal = currentIsCompleted ? 0 : 1;
-
-    // 즉시 UI 반영
     setMissions(prev =>
       prev.map(m => m.detail_idx === detailIdx ? { ...m, is_completed: newVal } : m)
     );
-
-    // DB 동기화
     try {
       await updateMissionCheck(detailIdx, newVal === 1);
     } catch (err) {
-      console.error('미션 상태 업데이트 실패, 롤백합니다:', err);
-      // 실패 시 롤백
       setMissions(prev =>
         prev.map(m => m.detail_idx === detailIdx ? { ...m, is_completed: currentIsCompleted } : m)
       );
@@ -82,6 +74,7 @@ export function useCoaching() {
     activeDay,
     setActiveDay,
     missions,
+    dailyAnalysis, // 노출
     isLocked,
     loadingPlan,
     loadingMissions,

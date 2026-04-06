@@ -86,7 +86,7 @@ const applyOptimization = (req, res) => {
   const { user_idx, solutions } = req.body;
 
   // 1. 오전 7시 기준, 오늘이 몇 일차인지 포함된 플랜 정보 가져오기
-  planModel.getPlanWithDayNumber(user_idx, (err, planResult) => {
+  planModel.getActivePlanWithDay(user_idx, (err, planResult) => {
     const plan = (planResult && planResult.length > 0) ? planResult[0] : null;
 
     if (err || !plan) {
@@ -98,7 +98,7 @@ const applyOptimization = (req, res) => {
     const plan_idx = plan.plan_idx;
 
     // 2. 해당 일차 미션 전체 교체 (기존에 이미 오늘 분석을 했더라도 덮어씌워짐)
-    planModel.resetDailyMissions(plan_idx, user_idx, day_number, solutions, (err2) => {
+    planModel.saveDailyMissions(plan_idx, user_idx, day_number, solutions, true, (err2) => {
       if (err2) {
         console.error('❌ 플랜 최적화 오류:', err2.message);
         return res.status(500).json({ success: false, message: "플랜 최적화 실패" });

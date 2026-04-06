@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getLatestFatigue, getWeeklyFatigue, getCalendarFatigue } from '../api/fatigueApi';
 import { getLatestLifelog } from '../api/lifelogApi';
+import { getPlanStatus, getDailyMissions } from '../api/planApi';
 
 const getFatigueEmoji = (fatigue) => {
   if (fatigue === 'high') return { emoji: '😵', label: '위험', color: '#ef4444' };
@@ -8,10 +9,10 @@ const getFatigueEmoji = (fatigue) => {
   return { emoji: '😊', label: '양호', color: '#22c55e' };
 };
 
-const DEFAULT_MISSIONS = [
-  { id: 1, text: '오후 2시 이후 카페인 섭취 금지' },
-  { id: 2, text: '취침 1시간 전 스마트폰 사용 중단' },
-  { id: 3, text: '취침 전 스팀 온열 안대 10분' },
+const FALLBACK_HOME_MISSIONS = [
+  '오후 2시 이후 카페인 섭취 금지',
+  '취침 1시간 전 스마트폰 사용 중단',
+  '취침 전 스팀 온열 안대 10분',
 ];
 
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
@@ -63,8 +64,18 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
 
   const [streak, setStreak]               = useState(0);
   const [analysisCount, setAnalysisCount] = useState(0);
-  const [missionChecks, setMissionChecks] = useState([false, false, false]);
-  const [missionSaved, setMissionSaved]   = useState(false);
+  const [homeMissions, setHomeMissions]   = useState(FALLBACK_HOME_MISSIONS);
+  const todayKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
+  const [missionChecks, setMissionChecks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`mission_checks_${todayKey}`)) || [false, false, false]; }
+    catch { return [false, false, false]; }
+  });
+  const [missionSaved, setMissionSaved] = useState(() => {
+    return localStorage.getItem(`mission_saved_${todayKey}`) === 'true';
+  });
 
   const today = new Date();
   const [calYear, setCalYear]       = useState(today.getFullYear());
@@ -117,6 +128,24 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       }
       setStreak(count > 0 ? count : 0);
     } catch (e) {}
+
+    // 플랜 미션 fetch (상위 3개 → 홈탭 미션)
+    getPlanStatus()
+      .then(planData => {
+        if (planData?.hasActivePlan && planData.current_day_number) {
+          return getDailyMissions(planData.current_day_number);
+        }
+      })
+      .then(res => {
+        if (res?.success && res.missions?.length > 0) {
+          // 상위 3개 미션 텍스트만 추출
+          const top3 = res.missions.slice(0, 3).map(m => m.plan_task);
+          setHomeMissions(top3);
+        }
+      })
+      .catch((err) => {
+        console.error("홈 미션 로드 실패:", err);
+      });
 
     // DB 데이터 fetch
     getLatestFatigue(user_idx)
@@ -184,16 +213,17 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     next[idx] = !next[idx];
     setMissionChecks(next);
     setMissionSaved(false);
+    localStorage.setItem(`mission_checks_${todayKey}`, JSON.stringify(next));
+    localStorage.removeItem(`mission_saved_${todayKey}`);
   };
 
   const saveMissions = () => {
     setMissionSaved(true);
+    localStorage.setItem(`mission_saved_${todayKey}`, 'true');
     if (missionChecks.every(Boolean)) {
       // 오늘 날짜로 미션 완료 저장
-      const now = new Date();
-      const key = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
       const history = JSON.parse(localStorage.getItem('sleeprescue_mission_history') || '{}');
-      history[key] = true;
+      history[todayKey] = true;
       localStorage.setItem('sleeprescue_mission_history', JSON.stringify(history));
       setStreak(prev => prev + 1);
     }
@@ -307,8 +337,8 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
         </div>
 
         <div style={{ margin: '12px 0 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {DEFAULT_MISSIONS.map((mission, idx) => (
-            <div key={mission.id} onClick={() => toggleMission(idx)} style={{
+          {homeMissions.map((missionText, idx) => (
+            <div key={idx} onClick={() => toggleMission(idx)} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '10px 12px',
               background: missionChecks[idx] ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)',
@@ -330,7 +360,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
                 color: missionChecks[idx] ? 'rgba(255,255,255,0.35)' : 'var(--text)',
                 transition: 'all 0.2s ease',
               }}>
-                {mission.text}
+                {missionText}
               </span>
             </div>
           ))}

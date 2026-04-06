@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from services.llm_service import get_sleep_analysis
 
 router = APIRouter()
 
@@ -30,6 +29,7 @@ async def gpt_coaching(data: AnalysisRequest):
     print("="*60 + "\n")
 
     try:
+        from services.llm_service import get_sleep_analysis
         # 데이터 객체를 dict로 변환하여 전달
         result = get_sleep_analysis(data.model_dump())
         return {
