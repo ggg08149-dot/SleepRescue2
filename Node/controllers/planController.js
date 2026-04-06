@@ -46,15 +46,16 @@ exports.startNewPlan = (req, res) => {
             user_idx,
             today: rows[0],
             yesterday: rows.length > 1 ? rows[1] : null
-          }, { timeout: 7000 });
+          }, { timeout: 30000 });
+          console.log("🔥 FastAPI 응답:", pyRes.data);
           
-          if (pyRes.data.solutions) {
+          if (pyRes.data && Array.isArray(pyRes.data.solutions)) {
             solutions = pyRes.data.solutions;
             analysis = pyRes.data.analysis; // GPT의 원본 분석글 추출
             isAi = true;
           }
         } catch (aiErr) {
-          console.warn("⚠️ AI 서버 장애로 표준 가이드를 제공합니다.");
+          console.warn("⚠️ AI 서버 장애:", aiErr.message);
         }
       }
 
