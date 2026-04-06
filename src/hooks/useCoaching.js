@@ -19,7 +19,7 @@ export function useCoaching() {
   useEffect(() => {
     const userIdx = localStorage.getItem('user_idx') || '1008';
     setLoadingPlan(true);
-    getPlanStatus(userIdx)
+    getPlanStatus()
       .then(data => {
         setPlanStatus(data);
         // 오늘 날짜로 초기 탭 설정
@@ -42,7 +42,7 @@ export function useCoaching() {
     setIsLocked(false);
     setMissions([]);
 
-    getDailyMissions(userIdx, activeDay)
+    getDailyMissions(activeDay)
       .then(data => {
         setMissions(data.missions || []);
       })
