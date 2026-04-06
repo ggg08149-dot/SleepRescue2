@@ -12,7 +12,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
     workHours: '9',
     sleepTime: '7.5',
   });
-  const [viewTab, setViewTab] = useState('scan');
+  const [viewTab, setViewTab] = useState(existingResult ? 'result' : 'scan');
 
   const {
     scanned, scanning, analyzing,

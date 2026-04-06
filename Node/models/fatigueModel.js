@@ -8,7 +8,8 @@ const insert = (data, cb) => {
 
 // 사용자의 가장 최근 피로지수 1건
 const getLatestByUser = (user_idx, cb) => {
-  const sql = `SELECT f.fatigue_score, f.fatigue_level
+  const sql = `SELECT f.fatigue_score, f.fatigue_level, f.fatigue_reason, f.analysis_result,
+                      DATE_FORMAT(l.created_at, '%Y-%m-%dT%H:%i:%s.000Z') AS created_at
                FROM tb_fatigue f
                JOIN tb_lifelog l ON f.lifelog_idx = l.lifelog_idx
                WHERE l.user_idx = ?
