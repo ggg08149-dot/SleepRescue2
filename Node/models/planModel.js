@@ -15,7 +15,7 @@ exports.getActivePlanWithDay = (user_idx, cb) => {
   const sql = `
     SELECT *, (DATEDIFF(NOW(), start_date) + 1) as current_day_number 
     FROM tb_plan 
-    WHERE user_idx = ? 
+    WHERE user_idx = ? AND status = 'active'
     ORDER BY start_date DESC LIMIT 1
   `;
   db.query(sql, [user_idx], cb);

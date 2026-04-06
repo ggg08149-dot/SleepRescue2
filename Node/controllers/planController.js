@@ -16,6 +16,16 @@ const FALLBACK_MISSIONS = [
 
 const FALLBACK_ANALYSIS = "현재 AI 서버와의 연결이 원활하지 않아 수면 구조대의 표준 가이드를 제공해 드립니다. 오늘 밤은 기본에 충실한 수면 습관으로 피로를 관리해 보세요!";
 
+function calcCurrentDay(start_date, plan_type) {
+  if (!start_date) return 1;
+  const start = new Date(start_date);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const elapsed = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.min(Math.max(elapsed, 1), plan_type);
+}
+
 // 1. 플랜 시작하기
 exports.startNewPlan = (req, res) => {
   const { plan_type } = req.body;
@@ -65,7 +75,11 @@ exports.getDailyMissions = (req, res) => {
     if (err || results.length === 0) return res.status(404).json({ success: false, message: "플랜 없음" });
 
     const plan = results[0];
-    if (requestedDay > plan.current_day_number) {
+
+    // ✅ 잠금 여부를 DB 값이 아닌 start_date 기준 실시간 계산으로 판단
+    const realCurrentDay = calcCurrentDay(plan.start_date, plan.plan_type);
+
+    if (requestedDay > realCurrentDay) {
       return res.status(403).json({ success: false, isLocked: true });
     }
 
@@ -74,15 +88,15 @@ exports.getDailyMissions = (req, res) => {
 
       // daily_analysis는 모든 행에 동일하게 저장되어 있으므로 첫 번째 행에서 추출
       const dailyAnalysis = missions[0].daily_analysis || "";
-      
+
       const typedMissions = missions.map((m, i) => ({
         ...m,
         type: i < 3 ? '필수' : i === 3 ? '선택' : '권장',
       }));
 
-      res.json({ 
-        success: true, 
-        day_number: requestedDay, 
+      res.json({
+        success: true,
+        day_number: requestedDay,
         missions: typedMissions,
         daily_analysis: dailyAnalysis // 프론트엔드 상단 카드용 원본 데이터
       });
@@ -90,13 +104,27 @@ exports.getDailyMissions = (req, res) => {
   });
 };
 
+// 3. 플랜 상태 조회
 exports.getPlanStatus = (req, res) => {
   planModel.getActivePlanWithDay(req.user.id, (err, r) => {
     if (err || r.length === 0) return res.json({ hasActivePlan: false });
-    res.json({ success: true, hasActivePlan: true, plan_type: r[0].plan_type, current_day_number: r[0].current_day_number });
+
+    const plan = r[0];
+
+    // ✅ start_date 기준으로 current_day_number 실시간 계산
+    const current_day_number = calcCurrentDay(plan.start_date, plan.plan_type);
+
+    res.json({
+      success: true,
+      hasActivePlan: true,
+      plan_type: plan.plan_type,
+      current_day_number,          // ← 계산된 값 반환
+      start_date: plan.start_date, // ← 프론트 참고용
+    });
   });
 };
 
+// 4. 미션 체크/해제
 exports.toggleMissionCheck = (req, res) => {
   const { detail_idx, is_completed } = req.body;
   planModel.updateMissionStatus(detail_idx, is_completed ? 1 : 0, (err) => res.json({ success: !err }));

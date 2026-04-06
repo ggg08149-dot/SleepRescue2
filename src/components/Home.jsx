@@ -64,7 +64,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
 
   const [streak, setStreak]               = useState(0);
   const [analysisCount, setAnalysisCount] = useState(0);
-  const [homeMissions, setHomeMissions]   = useState(FALLBACK_HOME_MISSIONS);
+  const [homeMissions, setHomeMissions]   = useState(null);
   const todayKey = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -130,21 +130,31 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     } catch (e) {}
 
     // 플랜 미션 fetch (상위 3개 → 홈탭 미션)
+    const extractTitle = (text) => text.includes(' - ') ? text.split(' - ')[0] : text;
+
     getPlanStatus()
       .then(planData => {
-        if (planData?.hasActivePlan && planData.current_day_number) {
-          return getDailyMissions(planData.current_day_number);
+        if (planData?.hasActivePlan) {
+          return getDailyMissions(1);
         }
       })
       .then(res => {
         if (res?.success && res.missions?.length > 0) {
-          // 상위 3개 미션 텍스트만 추출
-          const top3 = res.missions.slice(0, 3).map(m => m.plan_task);
-          setHomeMissions(top3);
+          setHomeMissions(res.missions.slice(0, 3).map(m => extractTitle(m.plan_task)));
+        } else {
+          const cached = JSON.parse(localStorage.getItem('last_gpt_coaching') || '{}');
+          if (cached.solutions?.length > 0) {
+            setHomeMissions(cached.solutions.slice(0, 3).map(extractTitle));
+          }
         }
       })
-      .catch((err) => {
-        console.error("홈 미션 로드 실패:", err);
+      .catch(() => {
+        try {
+          const cached = JSON.parse(localStorage.getItem('last_gpt_coaching') || '{}');
+          if (cached.solutions?.length > 0) {
+            setHomeMissions(cached.solutions.slice(0, 3).map(extractTitle));
+          }
+        } catch {}
       });
 
     // DB 데이터 fetch
@@ -337,7 +347,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
         </div>
 
         <div style={{ margin: '12px 0 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {homeMissions.map((missionText, idx) => (
+          {homeMissions ? homeMissions.map((missionText, idx) => (
             <div key={idx} onClick={() => toggleMission(idx)} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '10px 12px',
@@ -363,11 +373,20 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
                 {missionText}
               </span>
             </div>
-          ))}
+          )) : (
+            <div style={{
+              padding: '14px 12px', borderRadius: '10px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px dashed rgba(255,255,255,0.1)',
+              textAlign: 'center', fontSize: '12px', color: 'var(--muted)',
+            }}>
+              측정을 진행해주세요.
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={saveMissions} disabled={missionSaved} style={{
+          {homeMissions && <button onClick={saveMissions} disabled={missionSaved} style={{
             background: missionSaved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
             border: `1px solid ${missionSaved ? 'rgba(34,197,94,0.35)' : 'var(--border)'}`,
             color: missionSaved ? '#22c55e' : 'var(--muted)',
@@ -376,7 +395,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
             fontFamily: "'Noto Sans KR', sans-serif", transition: 'all 0.3s ease',
           }}>
             {missionSaved ? '✓ 저장됨' : '저장하기'}
-          </button>
+          </button>}
           <button onClick={() => startCoaching && startCoaching(7)} style={{
             flex: 1,
             background: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(110,231,247,0.08))',
