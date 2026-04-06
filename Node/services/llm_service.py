@@ -100,7 +100,7 @@ def detect_risk_flags(today: dict) -> List[str]:
     caffeine = float(today.get("caffeine",      0) or 0)
     phone_h  = float(today.get("phone_hours",   0) or 0)
     work_h   = float(today.get("work_hours",    0) or 0)
-    stress   = int(  today.get("stress_level",  0) or 0)
+    # stress   = int(  today.get("stress_level",  0) or 0)
 
     if sleep_h < 4:
         flags.append(f"수면 {sleep_h}시간 미만 - 면역·인지 기능 저하 위험")
@@ -112,8 +112,8 @@ def detect_risk_flags(today: dict) -> List[str]:
         flags.append(f"카페인 {caffeine}mg - 400mg 상한 근접")
     if work_h >= 12:
         flags.append(f"근무 {work_h}시간 - 만성 피로 축적 가능")
-    if stress >= 8:
-        flags.append(f"스트레스 {stress}/10 - 번아웃·수면 질 저하 위험")
+    # if stress >= 8:
+        # flags.append(f"스트레스 {stress}/10 - 번아웃·수면 질 저하 위험")
     if phone_h >= 4 and sleep_h < 6:
         flags.append("고스크린타임 + 단수면 동시 감지")
     return flags
@@ -159,7 +159,7 @@ def build_grounding_context(today: dict, yesterday) -> tuple:
         + safe_diff("caffeine",    "mg",   reverse=True) + "\n"
         + safe_diff("phone_hours", "시간", reverse=True) + "\n"
         + safe_diff("work_hours",  "시간", reverse=True) + "\n"
-        + safe_diff("stress_level","/10",  reverse=True)
+        # + safe_diff("stress_level","/10",  reverse=True)
     )
     return grounding, delta
 
