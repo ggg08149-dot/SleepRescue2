@@ -10,11 +10,11 @@ const updateSleepScore = (sleep_score, lifelog_idx, cb) => {
   db.query('UPDATE tb_lifelog SET sleep_score = ? WHERE lifelog_idx = ?', [sleep_score, lifelog_idx], cb);
 };
 
-const updateSleepPrediction = (sleep_hours, sleep_score, lifelog_idx, cb) => {
+const updateSleepPrediction = (sleep_score, lifelog_idx, cb) => {
   const sql = `UPDATE tb_lifelog 
-               SET sleep_hours = ?, sleep_score = ? 
+               SET sleep_score = ? 
                WHERE lifelog_idx = ?`;
-  db.query(sql, [sleep_hours, sleep_score, lifelog_idx], cb);
+  db.query(sql, [sleep_score, lifelog_idx], cb);
 };
 
 // 사용자의 가장 최근 lifelog 1건
