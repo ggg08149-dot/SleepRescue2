@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getFatigueHistory, deleteFatigueRecord } from '../api/fatigueApi';
+import { getLatestFatigue } from '../api/fatigueApi';
 import { startPlan } from '../api/planApi';
+
+const dbRowToResult = (row) => ({
+  fatigue      : row.fatigue_level,
+  fatigueCause : row.fatigue_reason,
+  fatigueDetails: (() => { try { return JSON.parse(row.analysis_result || '[]'); } catch { return []; } })(),
+  score        : row.fatigue_score,
+  savedAt      : row.created_at,
+});
 
 const getFatigueMessage = (fatigue, userName, causeName) => {
   if (fatigue === 'high') return `분석 결과, ${userName}님의 오늘의 피로도가 '높음' 상태예요. ${causeName}의 영향으로 다크서클이 평소보다 훨씬 짙게 측정되었으니, 오늘만큼은 수면 구조대의 특급 처방전에 몸을 맡겨보세요!`;
@@ -26,15 +34,6 @@ const PLAN_DATA = [
   { n: 7,  days: '7',  label: '7일 플랜',  desc: '일주일만 투자하세요.\n내 눈가를 어둡게 만든 진짜 범인을 찾아드립니다.' },
   { n: 15, days: '15', label: '15일 플랜', desc: '만성 피로 탈출 프로젝트.\n다크서클 없는 맑은 아침을 약속합니다.' },
 ];
-
-const toResultProps = (row) => ({
-  fatigue      : row.fatigue_level,
-  fatigueCause : row.fatigue_reason,
-  fatigueDetails: (() => { try { return JSON.parse(row.analysis_result || '[]'); } catch { return []; } })(),
-  score        : row.fatigue_score,
-  savedAt      : row.created_at,
-  fatigue_idx  : row.fatigue_idx,
-});
 
 // ─── 결과 카드 ────────────────────────────────────
 export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onStartCoaching, planSaving = false }) {
@@ -202,20 +201,20 @@ export function ResultCard({ result, userName, selectedPlan, onSelectPlan, onSta
   );
 }
 
-const fatigueColor = (f) => f === 'high' ? '#ef4444' : f === 'mid' ? '#f59e0b' : '#22c55e';
-const fatigueLabel = (f) => f === 'high' ? '높음' : f === 'mid' ? '주의' : '낮음';
-const fatigueIcon  = (f) => f === 'high' ? '🔥' : f === 'mid' ? '⚠️' : '✅';
-
 // ─── 분석 결과 탭 ─────────────────────────────────
-function AnalysisResult({ currentResult, existingResult, userName, userIdx, startCoaching, onSwitchToScan }) {
-  const [selectedPlan, setSelectedPlan]     = useState(null);
-  const [history, setHistory]               = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [expanded, setExpanded]             = useState(false);
-  const [viewItem, setViewItem]             = useState(null);
-  const [planSaving, setPlanSaving]         = useState(false);
+function AnalysisResult({ currentResult, existingResult, userName, startCoaching, onSwitchToScan }) {
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [planSaving, setPlanSaving]     = useState(false);
+  const [latestFromDB, setLatestFromDB] = useState(null);
 
-  const latestFromDB  = history.length > 0 ? toResultProps(history[0]) : null;
+  useEffect(() => {
+    const user_idx = localStorage.getItem('user_idx');
+    if (!user_idx || currentResult || existingResult) return;
+    getLatestFatigue(user_idx)
+      .then(res => { if (res.success && res.data) setLatestFromDB(dbRowToResult(res.data)); })
+      .catch(() => {});
+  }, [currentResult, existingResult]);
+
   const displayResult = currentResult || existingResult || latestFromDB;
 
   const dateLabel = (() => {
@@ -242,135 +241,29 @@ function AnalysisResult({ currentResult, existingResult, userName, userIdx, star
     startCoaching(planN);
   };
 
-  const fetchHistory = async () => {
-    if (!userIdx) { setHistoryLoading(false); return; }
-    try {
-      const res = await getFatigueHistory(userIdx);
-      if (res.success) setHistory(res.data || []);
-    } catch (e) {
-      console.error('히스토리 조회 실패:', e);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchHistory(); }, [currentResult, userIdx]);
-
-  const handleDelete = async (e, fatigue_idx) => {
-    e.stopPropagation();
-    if (!window.confirm('이 분석 결과를 삭제할까요?')) return;
-    try {
-      const res = await deleteFatigueRecord(fatigue_idx, userIdx);
-      if (res.success) {
-        setHistory(prev => prev.filter(h => h.fatigue_idx !== fatigue_idx));
-        if (viewItem?.fatigue_idx === fatigue_idx) setViewItem(null);
-      } else {
-        alert('삭제 실패: ' + (res.message || '오류'));
-      }
-    } catch (e) {
-      alert('삭제 중 오류가 발생했습니다.');
-    }
-  };
-
-  const visibleHistory = history.slice(0, expanded ? history.length : 2);
-
   return (
     <div>
-      {viewItem ? (
+      {displayResult ? (
         <>
-          <button onClick={() => setViewItem(null)} style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            background: 'linear-gradient(135deg, rgba(110,231,247,0.15), rgba(110,231,247,0.08))',
-            border: '1px solid rgba(110,231,247,0.4)', color: '#6ee7f7',
-            padding: '10px 20px', borderRadius: '10px', cursor: 'pointer',
-            fontFamily: "'Noto Sans KR', sans-serif", fontSize: '14px', fontWeight: 600,
-            marginBottom: '14px', width: '100%', justifyContent: 'center',
-            boxShadow: '0 0 10px rgba(110,231,247,0.15)',
-          }}>
-            ← 목록으로 돌아가기
-          </button>
-          <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '10px' }}>
-            📅 {viewItem.savedAt} 분석 결과
-          </div>
-          <ResultCard result={viewItem} userName={userName} selectedPlan={selectedPlan}
+          {dateLabel && (
+            <div style={{ marginBottom: '10px', padding: '8px 14px', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '10px', fontSize: '12px', color: 'var(--accent2)', textAlign: 'center', fontWeight: 500 }}>
+              📅 {dateLabel}
+            </div>
+          )}
+          <ResultCard result={displayResult} userName={userName} selectedPlan={selectedPlan}
             onSelectPlan={setSelectedPlan} onStartCoaching={() => handleStartCoaching(selectedPlan)} planSaving={planSaving} />
         </>
       ) : (
-        <>
-          {historyLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)', fontSize: '13px' }}>
-              ⏳ 분석 기록을 불러오는 중...
-            </div>
-          ) : displayResult ? (
-            <>
-              {dateLabel && (
-                <div style={{ marginBottom: '10px', padding: '8px 14px', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '10px', fontSize: '12px', color: 'var(--accent2)', textAlign: 'center', fontWeight: 500 }}>
-                  📅 {dateLabel}
-                </div>
-              )}
-              <ResultCard result={displayResult} userName={userName} selectedPlan={selectedPlan}
-                onSelectPlan={setSelectedPlan} onStartCoaching={() => handleStartCoaching(selectedPlan)} planSaving={planSaving} />
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--bg2)', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '14px' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: 'var(--accent)', marginBottom: '8px' }}>
-                아직 분석 결과가 없어요
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
-                스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
-                스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
-              </div>
-              <button onClick={onSwitchToScan} className="scan-btn">📷 분석하러 가기</button>
-            </div>
-          )}
-
-          {history.length > 0 && (
-            <>
-              <div className="section-title" style={{ marginTop: '8px' }}>이전 분석 결과</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {visibleHistory.map((item) => {
-                  const props = toResultProps(item);
-                  return (
-                    <div key={item.fatigue_idx}
-                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                      onClick={() => setViewItem(props)}
-                    >
-                      <div style={{ fontSize: '22px' }}>{fatigueIcon(item.fatigue_level)}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                          <span style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: '13px', fontWeight: 700, color: '#fff' }}>피로도</span>
-                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700, color: fatigueColor(item.fatigue_level), background: `${fatigueColor(item.fatigue_level)}22`, border: `1px solid ${fatigueColor(item.fatigue_level)}66` }}>
-                            {fatigueLabel(item.fatigue_level)}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                          📅 {item.created_at}{item.fatigue_reason && ` · ${item.fatigue_reason.slice(0, 15)}...`}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--muted)' }}>상세보기 ▶</span>
-                        <button onClick={(e) => handleDelete(e, item.fatigue_idx)}
-                          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', fontSize: '11px', fontFamily: "'Noto Sans KR', sans-serif" }}>
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {history.length > 2 && (
-                <button onClick={() => setExpanded(prev => !prev)}
-                  style={{ width: '100%', marginTop: '8px', padding: '10px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--muted)', fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px', cursor: 'pointer' }}>
-                  {expanded ? '▲ 접기' : `▼ 펼쳐보기 (${history.length - 2}건 더보기)`}
-                </button>
-              )}
-            </>
-          )}
-        </>
+        <div style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--bg2)', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '14px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '22px', color: 'var(--accent)', marginBottom: '8px' }}>
+            아직 분석 결과가 없어요
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '20px' }}>
+            스캔 탭에서 촬영 후<br />AI 분석을 시작해보세요!
+          </div>
+          <button onClick={onSwitchToScan} className="scan-btn">📷 분석하러 가기</button>
+        </div>
       )}
     </div>
   );

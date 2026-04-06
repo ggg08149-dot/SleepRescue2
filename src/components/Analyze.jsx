@@ -297,7 +297,6 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           currentResult={displayResult}
           existingResult={existingResult}
           userName={userName}
-          userIdx={userIdx}
           startCoaching={startCoaching}
           onSwitchToScan={() => setViewTab('scan')}
         />
