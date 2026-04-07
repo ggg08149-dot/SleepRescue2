@@ -71,7 +71,6 @@ const PLAN_MISSIONS = {
   ]
 };
 
-// ✅ 산속 계곡 + 캠프파이어 추가
 const WHITE_NOISE = [
   { title: '빗소리',          artist: '자연 백색소음',  icon: '🌧', url: '/sounds/rain.mp3',    aiTag: 'stress' },
   { title: '파도 소리',       artist: '해변 백색소음',  icon: '🌊', url: '/sounds/wave.mp3',    aiTag: 'fatigue' },
@@ -81,13 +80,12 @@ const WHITE_NOISE = [
   { title: '캠프파이어',      artist: '자연 백색소음',  icon: '🔥', url: '/sounds/fire.mp3',    aiTag: 'relax' },
 ];
 
-// ✅ AI 추천 로직
 const getAiRecommended = (analysisResult) => {
   if (!analysisResult) return 3;
   const fatigue = analysisResult?.fatigue;
-  if (fatigue === 'high') return 3; // Deep Sleep Waves
-  if (fatigue === 'mid')  return 0; // 빗소리
-  return 2;                         // 숲속 바람
+  if (fatigue === 'high') return 3;
+  if (fatigue === 'mid')  return 0;
+  return 2;
 };
 
 const getAiReason = (idx, analysisResult) => {
@@ -99,14 +97,12 @@ const getAiReason = (idx, analysisResult) => {
   return '';
 };
 
-// ✅ 음파 애니메이션
 function SoundWave() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '16px' }}>
       {[1,2,3,4].map(i => (
         <div key={i} style={{
-          width: '3px', borderRadius: '2px',
-          background: 'var(--accent)',
+          width: '3px', borderRadius: '2px', background: 'var(--accent)',
           animation: `soundwave ${0.4 + i * 0.1}s ease-in-out infinite alternate`,
           height: `${4 + i * 3}px`,
         }} />
@@ -129,27 +125,66 @@ const PLAN_INFO = {
 };
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
-  const [activePlan, setActivePlan] = useState(initialPlan);
+  const [activePlan, setActivePlan]     = useState(initialPlan);
   const [gptSolutions, setGptSolutions] = useState([]);
   const [gptAnalysis, setGptAnalysis]   = useState("");
   const [loadingGpt, setLoadingGpt]     = useState(false);
   const [activeDay, setActiveDay]       = useState(1);
+
+  // ✅ 정적 미션 체크 상태
   const [checks, setChecks]             = useState({});
+  // ✅ GPT 솔루션 체크 상태 (플랜+일차별 분리)
+  const [gptChecks, setGptChecks]       = useState({});
+
   const [playingIdx, setPlayingIdx]     = useState(null);
   const [volume, setVolume]             = useState(0.5);
   const [timer, setTimer]               = useState(null);
   const [timeLeft, setTimeLeft]         = useState(null);
-  const audioRef  = useRef(null);
-  const timerRef  = useRef(null);
+  const audioRef = useRef(null);
+  const timerRef = useRef(null);
 
   const aiRecommended = getAiRecommended(analysisResult);
+
+  // ✅ GPT 솔루션 체크 키 (플랜 + 일차별)
+  const gptCheckKey  = `gpt_p${activePlan}_d${activeDay}`;
+  const dayGptChecks = gptChecks[gptCheckKey] || {};
+
+  // ✅ GPT 솔루션 있으면 GPT 기준, 없으면 정적 기준
+  const useGpt        = gptSolutions.length > 0;
+  const planDays      = PLAN_MISSIONS[activePlan] || PLAN_MISSIONS[7];
+  const currentDay    = planDays.find(d => d.day === activeDay) || planDays[0];
+  const dayKey        = `plan${activePlan}_day${activeDay}`;
+  const dayChecks     = checks[dayKey] || {};
+
+  const totalMissions = useGpt ? gptSolutions.length : currentDay.missions.length;
+  const doneMissions  = useGpt
+    ? Object.values(dayGptChecks).filter(Boolean).length
+    : Object.values(dayChecks).filter(Boolean).length;
+  const progressPct   = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
+
+  // ✅ 전체 플랜 진행률
+  const planProgress = (() => {
+    const totalAll = useGpt
+      ? gptSolutions.length * planDays.length
+      : planDays.reduce((s, d) => s + d.missions.length, 0);
+    const doneAll = useGpt
+      ? planDays.reduce((s, d) => {
+          const k = `gpt_p${activePlan}_d${d.day}`;
+          return s + Object.values(gptChecks[k] || {}).filter(Boolean).length;
+        }, 0)
+      : planDays.reduce((s, d) => {
+          const k = `plan${activePlan}_day${d.day}`;
+          return s + Object.values(checks[k] || {}).filter(Boolean).length;
+        }, 0);
+    return totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
+  })();
 
   // 볼륨 변경
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
-  // 타이머 카운트다운
+  // 타이머
   useEffect(() => {
     if (timeLeft === null) return;
     if (timeLeft <= 0) { stopAudio(); return; }
@@ -157,19 +192,21 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
     return () => clearTimeout(timerRef.current);
   }, [timeLeft]);
 
-  // GPT 코칭 fetch (기존 로직 그대로 유지)
+  // GPT 코칭 fetch
   useEffect(() => {
     let isMounted = true;
     const fetchGptCoaching = async () => {
       const cachedData = localStorage.getItem('last_gpt_coaching');
       const analysisId = analysisResult ? JSON.stringify(analysisResult) : 'no_data';
       if (cachedData) {
-        const { id, solutions, analysis } = JSON.parse(cachedData);
-        if (id === analysisId) {
-          setGptSolutions(solutions || []);
-          setGptAnalysis(analysis || "");
-          return;
-        }
+        try {
+          const { id, solutions, analysis } = JSON.parse(cachedData);
+          if (id === analysisId) {
+            setGptSolutions(solutions || []);
+            setGptAnalysis(analysis || "");
+            return;
+          }
+        } catch {}
       }
       setLoadingGpt(true);
       try {
@@ -207,8 +244,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
     if (playingIdx === idx) { stopAudio(); return; }
     if (audioRef.current) audioRef.current.pause();
     const audio = new Audio(WHITE_NOISE[idx].url);
-    audio.loop   = true;
-    audio.volume = volume;
+    audio.loop = true; audio.volume = volume;
     audio.play().catch(() => {});
     audioRef.current = audio;
     setPlayingIdx(idx);
@@ -222,32 +258,42 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const formatTime = (sec) => `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
 
-  const planDays    = PLAN_MISSIONS[activePlan] || PLAN_MISSIONS[7];
-  const fatigue     = analysisResult?.fatigue    || 'high';
-  const darkCircle  = analysisResult?.darkCircle || 72;
-  const sleepScore  = analysisResult?.sleepScore || 4.2;
-  const fatigueNum  = fatigue === 'high' ? 72 : fatigue === 'mid' ? 45 : 20;
-  const fatigueLabel = fatigue === 'high' ? '위험 단계' : fatigue === 'mid' ? '주의 단계' : '양호';
-  const fatigueColor = fatigue === 'high' ? '#ef4444' : fatigue === 'mid' ? '#f59e0b' : '#22c55e';
-
-  const currentDay    = planDays.find(d => d.day === activeDay) || planDays[0];
-  const dayKey        = `plan${activePlan}_day${activeDay}`;
-  const dayChecks     = checks[dayKey] || {};
-  const totalMissions = currentDay.missions.length;
-  const doneMissions  = Object.values(dayChecks).filter(Boolean).length;
-  const progressPct   = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
-  const totalAll      = planDays.reduce((s, d) => s + d.missions.length, 0);
-  const doneAll       = planDays.reduce((s, d) => {
-    const k = `plan${activePlan}_day${d.day}`;
-    return s + Object.values(checks[k] || {}).filter(Boolean).length;
-  }, 0);
-  const planProgress = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
-
+  // ✅ 정적 미션 체크 토글
   const toggleCheck = (missionId) => {
     setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
   };
 
+  // ✅ GPT 솔루션 체크 토글
+  const toggleGptCheck = (idx) => {
+    setGptChecks(prev => ({ ...prev, [gptCheckKey]: { ...(prev[gptCheckKey] || {}), [idx]: !(prev[gptCheckKey]?.[idx]) } }));
+  };
+
   const handlePlanChange = (plan) => { setActivePlan(plan); setActiveDay(1); };
+
+  // ✅ 잠금 해제 조건 (GPT/정적 둘 다 지원)
+  const isUnlocked = (day) => {
+    if (day === 1) return true;
+    if (useGpt) {
+      const k = `gpt_p${activePlan}_d${day - 1}`;
+      return Object.values(gptChecks[k] || {}).filter(Boolean).length === gptSolutions.length && gptSolutions.length > 0;
+    } else {
+      const k = `plan${activePlan}_day${day - 1}`;
+      const prev = planDays.find(d => d.day === day - 1);
+      return prev ? Object.values(checks[k] || {}).filter(Boolean).length === prev.missions.length && prev.missions.length > 0 : true;
+    }
+  };
+
+  // ✅ 날짜 완료 여부
+  const isDayDone = (day) => {
+    if (useGpt) {
+      const k = `gpt_p${activePlan}_d${day}`;
+      return gptSolutions.length > 0 && Object.values(gptChecks[k] || {}).filter(Boolean).length === gptSolutions.length;
+    } else {
+      const k = `plan${activePlan}_day${day}`;
+      const d = planDays.find(pd => pd.day === day);
+      return d ? Object.values(checks[k] || {}).filter(Boolean).length === d.missions.length && d.missions.length > 0 : false;
+    }
+  };
 
   const getCharacter = () => {
     if (progressPct === 100) return { emoji: '🌟', msg: '오늘 완벽해요!' };
@@ -260,7 +306,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   return (
     <div className="coaching-screen">
 
-      {/* ✅ AI 코칭 분석 요약 카드 (기존 그대로) */}
+      {/* AI 코칭 분석 요약 */}
       {gptAnalysis && (
         <div className="coaching-card" style={{ border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.05)', marginBottom: '16px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -270,7 +316,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         </div>
       )}
 
-      {/* ✅ AI 맞춤 솔루션 카드 (기존 그대로) */}
+      {/* AI 맞춤 솔루션 */}
       <div className="section-title" style={{ color: '#6ee7f7' }}>🤖 AI 맞춤 수면 솔루션</div>
       <div className="coaching-card" style={{ border: '1px solid rgba(110,231,247,0.3)', background: 'rgba(110,231,247,0.05)', marginBottom: '25px' }}>
         {loadingGpt ? (
@@ -313,17 +359,9 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         })}
       </div>
 
-      {/* 플랜 진행 퍼센트 */}
-      <div style={{
-        background: 'rgba(110,231,247,0.06)',
-        border: '1px solid rgba(110,231,247,0.2)',
-        borderRadius: '14px', padding: '14px 16px',
-        marginBottom: '14px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
-          {activePlan}일 플랜 진행률
-        </div>
+      {/* 플랜 진행률 */}
+      <div style={{ background: 'rgba(110,231,247,0.06)', border: '1px solid rgba(110,231,247,0.2)', borderRadius: '14px', padding: '14px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{activePlan}일 플랜 진행률</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '100px', height: '6px', background: 'rgba(255,255,255,0.07)', borderRadius: '4px', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${planProgress}%`, background: 'linear-gradient(90deg,var(--accent),#4dd8ee)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
@@ -332,67 +370,38 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         </div>
       </div>
 
-      {/* 일차별 탭 - 이전 날 완료 시 잠금 해제 */}
+      {/* 일차별 탭 */}
       <div style={{ marginBottom: '14px' }}>
         <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>
           수면 코칭 플랜 — {activePlan}일 과정
         </div>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
           {planDays.map(d => {
-            const k        = `plan${activePlan}_day${d.day}`;
-            const dc       = checks[k] || {};
-            const allDone  = Object.values(dc).filter(Boolean).length === d.missions.length && d.missions.length > 0;
-
-            // 잠금 해제 조건: D1은 항상 열림, 이전 날 미션 모두 완료 시 열림
-            const prevKey   = d.day > 1 ? `plan${activePlan}_day${d.day - 1}` : null;
-            const prevDay   = d.day > 1 ? planDays.find(pd => pd.day === d.day - 1) : null;
-            const prevDone  = prevDay
-              ? Object.values(checks[prevKey] || {}).filter(Boolean).length === prevDay.missions.length && prevDay.missions.length > 0
-              : true;
-            const isUnlocked = d.day === 1 || prevDone;
-            const isActive   = activeDay === d.day;
-
+            const unlocked = isUnlocked(d.day);
+            const done     = isDayDone(d.day);
+            const active   = activeDay === d.day;
             return (
               <button key={d.day}
-                onClick={() => isUnlocked && setActiveDay(d.day)}
-                disabled={!isUnlocked}
+                onClick={() => unlocked && setActiveDay(d.day)}
+                disabled={!unlocked}
                 style={{
                   flexShrink: 0, padding: '6px 12px', borderRadius: '8px',
-                  cursor: isUnlocked ? 'pointer' : 'not-allowed',
-                  border: `1px solid ${
-                    isActive   ? 'rgba(110,231,247,0.5)' :
-                    allDone    ? 'rgba(34,197,94,0.4)' :
-                    !isUnlocked ? 'rgba(255,255,255,0.06)' :
-                    'var(--border)'
-                  }`,
-                  background: isActive
-                    ? 'rgba(110,231,247,0.12)'
-                    : allDone
-                    ? 'rgba(34,197,94,0.08)'
-                    : !isUnlocked
-                    ? 'rgba(255,255,255,0.02)'
-                    : 'var(--bg3)',
-                  color: isActive
-                    ? 'var(--accent)'
-                    : allDone
-                    ? '#22c55e'
-                    : !isUnlocked
-                    ? 'rgba(255,255,255,0.2)'
-                    : 'var(--muted)',
-                  fontFamily: "'Bebas Neue',sans-serif",
-                  fontSize: '13px', letterSpacing: '0.5px',
-                  transition: 'all 0.2s',
-                  opacity: isUnlocked ? 1 : 0.5,
+                  cursor: unlocked ? 'pointer' : 'not-allowed',
+                  border: `1px solid ${active ? 'rgba(110,231,247,0.5)' : done ? 'rgba(34,197,94,0.4)' : !unlocked ? 'rgba(255,255,255,0.06)' : 'var(--border)'}`,
+                  background: active ? 'rgba(110,231,247,0.12)' : done ? 'rgba(34,197,94,0.08)' : !unlocked ? 'rgba(255,255,255,0.02)' : 'var(--bg3)',
+                  color: active ? 'var(--accent)' : done ? '#22c55e' : !unlocked ? 'rgba(255,255,255,0.2)' : 'var(--muted)',
+                  fontFamily: "'Bebas Neue',sans-serif", fontSize: '13px', letterSpacing: '0.5px',
+                  opacity: unlocked ? 1 : 0.5, transition: 'all 0.2s',
                 }}
               >
-                {allDone ? '✓' : !isUnlocked ? '🔒' : `D${d.day}`}
+                {done ? '✓' : !unlocked ? '🔒' : `D${d.day}`}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 오늘 미션 */}
+      {/* 미션 체크리스트 */}
       <div className="section-title">DAY {activeDay} — {currentDay.title}</div>
       <div className="coaching-card">
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
@@ -400,31 +409,64 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
               <span>{char.msg}</span>
-              <span style={{ color: doneMissions === totalMissions ? '#22c55e' : 'var(--accent)' }}>{doneMissions}/{totalMissions} 완료</span>
+              <span style={{ color: doneMissions === totalMissions && totalMissions > 0 ? '#22c55e' : 'var(--accent)' }}>{doneMissions}/{totalMissions} 완료</span>
             </div>
             <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${progressPct}%`, background: progressPct === 100 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,var(--accent),#4dd8ee)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
             </div>
           </div>
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {currentDay.missions.map(mission => {
-            const isChecked = dayChecks[mission.id] || false;
-            const tc = TYPE_COLOR[mission.type];
-            return (
-              <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
-                <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`, background: isChecked ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#0b0b13', fontWeight: 700 }}>{isChecked && '✓'}</div>
-                <span style={{ fontSize: '12px', flex: 1, textDecoration: isChecked ? 'line-through' : 'none', color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)' }}>{mission.text}</span>
-                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color }}>{mission.type}</span>
-              </div>
-            );
-          })}
+          {useGpt ? (
+            // ✅ GPT 솔루션 → 체크리스트로 표시
+            gptSolutions.map((solution, idx) => {
+              const isChecked = dayGptChecks[idx] || false;
+              const type = idx === 0 ? '필수' : idx <= 2 ? '권장' : '선택';
+              const tc   = TYPE_COLOR[type];
+              return (
+                <div key={idx} onClick={() => toggleGptCheck(idx)} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0, marginTop: '1px', border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`, background: isChecked ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#0b0b13', fontWeight: 700 }}>{isChecked && '✓'}</div>
+                  <div style={{ flex: 1 }}>
+                    {solution.includes(' - ') ? (
+                      <>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)', textDecoration: isChecked ? 'line-through' : 'none' }}>{solution.split(' - ')[0]}</div>
+                        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px', textDecoration: isChecked ? 'line-through' : 'none' }}>{solution.split(' - ').slice(1).join(' - ')}</div>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)', textDecoration: isChecked ? 'line-through' : 'none' }}>{solution}</span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color, flexShrink: 0 }}>{type}</span>
+                </div>
+              );
+            })
+          ) : (
+            // ✅ GPT 없을 때 → PLAN_MISSIONS 고정 표시
+            currentDay.missions.map(mission => {
+              const isChecked = dayChecks[mission.id] || false;
+              const tc = TYPE_COLOR[mission.type];
+              return (
+                <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `1.5px solid ${isChecked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`, background: isChecked ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#0b0b13', fontWeight: 700 }}>{isChecked && '✓'}</div>
+                  <span style={{ fontSize: '12px', flex: 1, textDecoration: isChecked ? 'line-through' : 'none', color: isChecked ? 'rgba(255,255,255,0.35)' : 'var(--text)' }}>{mission.text}</span>
+                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: tc.bg, border: `1px solid ${tc.border}`, color: tc.color }}>{mission.type}</span>
+                </div>
+              );
+            })
+          )}
         </div>
+
+        {/* 완료 축하 */}
+        {progressPct === 100 && totalMissions > 0 && (
+          <div style={{ marginTop: '14px', padding: '12px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', textAlign: 'center', fontSize: '13px', color: '#4ade80', fontWeight: 700 }}>
+            🎉 DAY {activeDay} 완료! 내일도 화이팅!
+          </div>
+        )}
       </div>
 
-      {/* ✅ 백색소음 업그레이드 */}
+      {/* 백색소음 */}
       <div className="music-card">
-        {/* 헤더 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
             <div style={{ fontSize: '10px', color: 'var(--accent)', letterSpacing: '1px', marginBottom: '4px' }}>🌙 수면 백색소음</div>
@@ -438,18 +480,12 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           </div>
         </div>
 
-        {/* 음악 목록 */}
         {WHITE_NOISE.map((m, idx) => {
           const isPlaying = playingIdx === idx;
           const isAI      = aiRecommended === idx;
           const aiReason  = getAiReason(idx, analysisResult);
           return (
-            <div key={m.title} style={{
-              marginBottom: '8px',
-              background: isPlaying ? 'rgba(110,231,247,0.08)' : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${isPlaying ? 'rgba(110,231,247,0.3)' : 'var(--border)'}`,
-              borderRadius: '12px', padding: '12px 14px', transition: 'all 0.2s ease',
-            }}>
+            <div key={m.title} style={{ marginBottom: '8px', background: isPlaying ? 'rgba(110,231,247,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isPlaying ? 'rgba(110,231,247,0.3)' : 'var(--border)'}`, borderRadius: '12px', padding: '12px 14px', transition: 'all 0.2s ease' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0, background: isPlaying ? 'rgba(110,231,247,0.15)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                   {isPlaying ? <SoundWave /> : m.icon}
@@ -457,11 +493,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: isPlaying ? 'var(--accent)' : 'var(--text)' }}>{m.title}</span>
-                    {isAI && (
-                      <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '20px', fontWeight: 700, background: 'rgba(167,139,250,0.2)', border: '1px solid rgba(167,139,250,0.4)', color: 'var(--accent2)' }}>
-                        🤖 AI 추천
-                      </span>
-                    )}
+                    {isAI && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '20px', fontWeight: 700, background: 'rgba(167,139,250,0.2)', border: '1px solid rgba(167,139,250,0.4)', color: 'var(--accent2)' }}>🤖 AI 추천</span>}
                   </div>
                   <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>{m.artist}</div>
                 </div>
@@ -470,54 +502,37 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
                 </div>
               </div>
               {isAI && aiReason && (
-                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--accent2)', background: 'rgba(167,139,250,0.08)', borderRadius: '8px', padding: '6px 10px' }}>
-                  💡 {aiReason}
-                </div>
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--accent2)', background: 'rgba(167,139,250,0.08)', borderRadius: '8px', padding: '6px 10px' }}>💡 {aiReason}</div>
               )}
             </div>
           );
         })}
 
-        {/* 볼륨 슬라이더 */}
+        {/* 볼륨 */}
         <div style={{ marginTop: '12px', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '14px' }}>🔈</span>
-            <input type="range" min="0" max="1" step="0.05" value={volume}
-              onChange={e => setVolume(parseFloat(e.target.value))}
-              style={{ flex: 1, accentColor: 'var(--accent)', height: '4px' }} />
+            <input type="range" min="0" max="1" step="0.05" value={volume} onChange={e => setVolume(parseFloat(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)', height: '4px' }} />
             <span style={{ fontSize: '14px' }}>🔊</span>
             <span style={{ fontSize: '11px', color: 'var(--muted)', minWidth: '32px', textAlign: 'right' }}>{Math.round(volume * 100)}%</span>
           </div>
         </div>
 
-        {/* 수면 타이머 */}
+        {/* 타이머 */}
         <div style={{ marginTop: '10px', padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div style={{ fontSize: '12px', color: 'var(--muted)' }}>⏱ 수면 타이머</div>
-            {timeLeft !== null && (
-              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '18px', color: 'var(--accent)' }}>{formatTime(timeLeft)}</div>
-            )}
+            {timeLeft !== null && <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '18px', color: 'var(--accent)' }}>{formatTime(timeLeft)}</div>}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[15, 30, 60].map(min => (
-              <button key={min} onClick={() => handleTimer(min)} style={{
-                flex: 1, padding: '8px 0', borderRadius: '10px', cursor: 'pointer',
-                border: `1px solid ${timer === min ? 'rgba(110,231,247,0.5)' : 'var(--border)'}`,
-                background: timer === min ? 'rgba(110,231,247,0.12)' : 'var(--bg2)',
-                color: timer === min ? 'var(--accent)' : 'var(--muted)',
-                fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px',
-                fontWeight: timer === min ? 700 : 400, transition: 'all 0.2s',
-              }}>{min}분</button>
+              <button key={min} onClick={() => handleTimer(min)} style={{ flex: 1, padding: '8px 0', borderRadius: '10px', cursor: 'pointer', border: `1px solid ${timer === min ? 'rgba(110,231,247,0.5)' : 'var(--border)'}`, background: timer === min ? 'rgba(110,231,247,0.12)' : 'var(--bg2)', color: timer === min ? 'var(--accent)' : 'var(--muted)', fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px', fontWeight: timer === min ? 700 : 400, transition: 'all 0.2s' }}>{min}분</button>
             ))}
             {(timer || playingIdx !== null) && (
               <button onClick={stopAudio} style={{ padding: '8px 12px', borderRadius: '10px', cursor: 'pointer', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontFamily: "'Noto Sans KR', sans-serif", fontSize: '12px' }}>정지</button>
             )}
           </div>
-          {timer && (
-            <div style={{ marginTop: '8px', fontSize: '10px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-              {timer}분 후 자동으로 꺼져요 🌙
-            </div>
-          )}
+          {timer && <div style={{ marginTop: '8px', fontSize: '10px', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>{timer}분 후 자동으로 꺼져요 🌙</div>}
         </div>
       </div>
     </div>
