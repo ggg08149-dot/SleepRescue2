@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { getPlanStatus } from '../api/planApi';
+import { getCalendarFatigue } from '../api/fatigueApi';
 
 const PLAN_MISSIONS = {
   1: [
@@ -125,16 +127,39 @@ const PLAN_INFO = {
 };
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
+  // 홈탭과 공유하는 오늘 날짜 키
+  const todayKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
+
   const [activePlan, setActivePlan]     = useState(initialPlan);
   const [gptSolutions, setGptSolutions] = useState([]);
   const [gptAnalysis, setGptAnalysis]   = useState("");
   const [loadingGpt, setLoadingGpt]     = useState(false);
   const [activeDay, setActiveDay]       = useState(1);
 
-  // ✅ 정적 미션 체크 상태
-  const [checks, setChecks]             = useState({});
-  // ✅ GPT 솔루션 체크 상태 (플랜+일차별 분리)
-  const [gptChecks, setGptChecks]       = useState({});
+  // 플랜 상태 (날짜 기반 해금용)
+  const [planStatus, setPlanStatus]     = useState(null);
+  // 캘린더 측정 데이터 { "YYYY-MM-DD": true }
+  const [calendarData, setCalendarData] = useState({});
+
+  // 홈탭 상위 3개 미션과 공유 (localStorage 동기화)
+  const [homeMissionChecks, setHomeMissionChecks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`mission_checks_${todayKey}`)) || [false, false, false]; }
+    catch { return [false, false, false]; }
+  });
+
+  // 정적 미션 체크 상태 (localStorage 유지)
+  const [checks, setChecks]             = useState(() => {
+    try { return JSON.parse(localStorage.getItem('coaching_checks')) || {}; }
+    catch { return {}; }
+  });
+  // GPT 솔루션 체크 상태 (localStorage 유지)
+  const [gptChecks, setGptChecks]       = useState(() => {
+    try { return JSON.parse(localStorage.getItem('coaching_gpt_checks')) || {}; }
+    catch { return {}; }
+  });
 
   const [playingIdx, setPlayingIdx]     = useState(null);
   const [volume, setVolume]             = useState(0.5);
@@ -142,6 +167,45 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [timeLeft, setTimeLeft]         = useState(null);
   const audioRef = useRef(null);
   const timerRef = useRef(null);
+
+  // 플랜 상태 + 캘린더 데이터 로드
+  useEffect(() => {
+    const userIdx = localStorage.getItem('user_idx');
+    if (!userIdx) return;
+
+    getPlanStatus()
+      .then(data => {
+        if (data?.hasActivePlan) {
+          setPlanStatus(data);
+          setActivePlan(data.plan_type);
+          setActiveDay(data.current_day_number);
+
+          const now = new Date();
+          getCalendarFatigue(userIdx, now.getFullYear(), now.getMonth() + 1)
+            .then(res => {
+              if (res?.success && res.data) {
+                const measured = {};
+                res.data.forEach(item => {
+                  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(item.day).padStart(2,'0')}`;
+                  measured[dateStr] = true;
+                });
+                setCalendarData(measured);
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // checks/gptChecks 변경 시 localStorage 저장
+  useEffect(() => {
+    localStorage.setItem('coaching_checks', JSON.stringify(checks));
+  }, [checks]);
+
+  useEffect(() => {
+    localStorage.setItem('coaching_gpt_checks', JSON.stringify(gptChecks));
+  }, [gptChecks]);
 
   const aiRecommended = getAiRecommended(analysisResult);
 
@@ -156,10 +220,16 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const dayKey        = `plan${activePlan}_day${activeDay}`;
   const dayChecks     = checks[dayKey] || {};
 
+  // D1 상위 3개는 홈탭과 공유된 homeMissionChecks 사용
+  const getMissionChecked = (missionId) => {
+    if (activeDay === 1 && missionId <= 3) return homeMissionChecks[missionId - 1] || false;
+    return dayChecks[missionId] || false;
+  };
+
   const totalMissions = useGpt ? gptSolutions.length : currentDay.missions.length;
   const doneMissions  = useGpt
     ? Object.values(dayGptChecks).filter(Boolean).length
-    : Object.values(dayChecks).filter(Boolean).length;
+    : currentDay.missions.filter(m => getMissionChecked(m.id)).length;
   const progressPct   = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
 
   // ✅ 전체 플랜 진행률
@@ -173,8 +243,11 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           return s + Object.values(gptChecks[k] || {}).filter(Boolean).length;
         }, 0)
       : planDays.reduce((s, d) => {
-          const k = `plan${activePlan}_day${d.day}`;
-          return s + Object.values(checks[k] || {}).filter(Boolean).length;
+          const dChecks = checks[`plan${activePlan}_day${d.day}`] || {};
+          return s + d.missions.filter(m => {
+            if (d.day === 1 && m.id <= 3) return homeMissionChecks[m.id - 1] || false;
+            return dChecks[m.id] || false;
+          }).length;
         }, 0);
     return totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
   })();
@@ -258,9 +331,17 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const formatTime = (sec) => `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
 
-  // ✅ 정적 미션 체크 토글
+  // ✅ 정적 미션 체크 토글 (D1 상위 3개는 홈탭과 공유)
   const toggleCheck = (missionId) => {
-    setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
+    if (activeDay === 1 && missionId <= 3) {
+      const next = [...homeMissionChecks];
+      next[missionId - 1] = !next[missionId - 1];
+      setHomeMissionChecks(next);
+      localStorage.setItem(`mission_checks_${todayKey}`, JSON.stringify(next));
+      localStorage.removeItem(`mission_saved_${todayKey}`);
+    } else {
+      setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
+    }
   };
 
   // ✅ GPT 솔루션 체크 토글
@@ -270,17 +351,28 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const handlePlanChange = (plan) => { setActivePlan(plan); setActiveDay(1); };
 
-  // ✅ 잠금 해제 조건 (GPT/정적 둘 다 지원)
+  // ✅ 해금 조건: 날짜 기반 (start_date + 경과일 >= day)
   const isUnlocked = (day) => {
-    if (day === 1) return true;
-    if (useGpt) {
-      const k = `gpt_p${activePlan}_d${day - 1}`;
-      return Object.values(gptChecks[k] || {}).filter(Boolean).length === gptSolutions.length && gptSolutions.length > 0;
-    } else {
-      const k = `plan${activePlan}_day${day - 1}`;
-      const prev = planDays.find(d => d.day === day - 1);
-      return prev ? Object.values(checks[k] || {}).filter(Boolean).length === prev.missions.length && prev.missions.length > 0 : true;
-    }
+    if (!planStatus) return day === 1;
+    return day <= planStatus.current_day_number;
+  };
+
+  // ✅ 해당 일차에 측정 기록 있는지 확인
+  const hasMeasurement = (day) => {
+    if (!planStatus?.start_date) return false;
+    const start = new Date(planStatus.start_date);
+    start.setHours(0, 0, 0, 0);
+    const target = new Date(start);
+    target.setDate(target.getDate() + (day - 1));
+    const dateStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+    return !!calendarData[dateStr];
+  };
+
+  // 오늘(현재 진행중인 날)은 항상 미션 표시, 지난 날은 측정 기록 있을 때만
+  const showMissions = (day) => {
+    if (!planStatus) return true;
+    if (day === planStatus.current_day_number) return true;
+    return hasMeasurement(day);
   };
 
   // ✅ 날짜 완료 여부
@@ -289,9 +381,13 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       const k = `gpt_p${activePlan}_d${day}`;
       return gptSolutions.length > 0 && Object.values(gptChecks[k] || {}).filter(Boolean).length === gptSolutions.length;
     } else {
-      const k = `plan${activePlan}_day${day}`;
       const d = planDays.find(pd => pd.day === day);
-      return d ? Object.values(checks[k] || {}).filter(Boolean).length === d.missions.length && d.missions.length > 0 : false;
+      if (!d) return false;
+      const dChecks = checks[`plan${activePlan}_day${day}`] || {};
+      return d.missions.every(m => {
+        if (day === 1 && m.id <= 3) return homeMissionChecks[m.id - 1] || false;
+        return dChecks[m.id] || false;
+      });
     }
   };
 
@@ -418,7 +514,17 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {useGpt ? (
+          {!showMissions(activeDay) ? (
+            // ✅ 지난 날 측정 기록 없음 → 동기부여 메시지
+            <div style={{ padding: '20px 16px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px' }}>
+              <div style={{ fontSize: '28px', marginBottom: '10px' }}>📭</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginBottom: '6px' }}>이날 측정 기록이 없어요</div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', lineHeight: '1.6' }}>
+                꾸준함이 수면을 바꿉니다 💪<br />
+                오늘부터 다시 시작해도 늦지 않아요!
+              </div>
+            </div>
+          ) : useGpt ? (
             // ✅ GPT 솔루션 → 체크리스트로 표시
             gptSolutions.map((solution, idx) => {
               const isChecked = dayGptChecks[idx] || false;
@@ -444,7 +550,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           ) : (
             // ✅ GPT 없을 때 → PLAN_MISSIONS 고정 표시
             currentDay.missions.map(mission => {
-              const isChecked = dayChecks[mission.id] || false;
+              const isChecked = getMissionChecked(mission.id);
               const tc = TYPE_COLOR[mission.type];
               return (
                 <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>

@@ -61,19 +61,16 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           { user_idx: userIdx },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
-        const { is_critical, delta_score, solutions } = gptRes.data;
+        const { is_critical, delta_score, solutions, comparison_analysis } = gptRes.data;
+        // 분석 완료 시 항상 오늘 일차 미션 DB 저장
+        await axios.post('http://localhost:7000/api/coaching/apply-optimization',
+          { user_idx: userIdx, solutions, analysis: comparison_analysis || "" },
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        localStorage.removeItem('last_gpt_coaching');
+        // 상태 변화가 클 때만 추가 알림
         if (is_critical) {
-          const confirmOptimization = window.confirm(
-            `⚠️ 상태 변화 감지 (차이: ${delta_score}점)\n\n재측정 결과로 현재 플랜의 미션을 최적화 할까요?\n\n[확인]을 누르시면 오늘 남은 미션이 현재 상태에 맞춰 재설정됩니다.`
-          );
-          if (confirmOptimization) {
-            await axios.post('http://localhost:7000/api/coaching/apply-optimization',
-              { user_idx: userIdx, solutions },
-              { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            alert("✅ 오늘의 미션이 최적화되었습니다. 코칭 탭에서 확인하세요!");
-            localStorage.removeItem('last_gpt_coaching');
-          }
+          alert(`⚠️ 상태 변화 감지 (차이: ${delta_score}점)\n오늘의 미션이 현재 상태에 맞춰 재설정되었습니다.`);
         }
       } catch (err) {
         console.error("GPT 코칭 분석/최적화 실패:", err);
