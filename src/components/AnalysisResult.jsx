@@ -295,22 +295,17 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
     return `${diff}일 전 기록입니다`;
   })();
 
-  const handleStartCoaching = async (planN) => {
-    if (!planN) return;
-    setPlanSaving(true);
-    try {
-      await startPlan(planN);
+ const handleStartCoaching = async (planN) => {
+  if (!planN) return;
 
-      // 🔥 이거 추가
-      setIsPlanActive(true);
-      setActivePlanType(planN);
-    } catch (e) {
-      console.error('플랜 저장 실패:', e);
-    } finally {
-      setPlanSaving(false);
-    }
-    startCoaching(planN);
-  };
+  // ✅ 먼저 즉시 이동!
+  startCoaching(planN);
+
+  // ✅ 저장은 백그라운드에서 (기다리지 않음)
+  if (userIdx) {
+    savePlan(userIdx, planN).catch(e => console.error('플랜 저장 실패:', e));
+  }
+};
 
   return (
     <div>
