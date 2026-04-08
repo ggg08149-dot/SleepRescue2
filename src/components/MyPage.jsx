@@ -173,6 +173,54 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
     return v ? parseInt(v) : null;
   });
 
+  // 통계 상태
+  const [statStreak, setStatStreak]         = useState(0);
+  const [statAnalysis, setStatAnalysis]     = useState(0);
+  const [statSleep, setStatSleep]           = useState('-');
+
+  // 통계 불러오기 (localStorage 기반)
+  useEffect(() => {
+    // 1. 연속 달성 streak
+    try {
+      const missionHistory = JSON.parse(
+        localStorage.getItem('sleeprescue_mission_history') || '{}'
+      );
+      let count = 0;
+      const now = new Date();
+      for (let i = 0; i < 365; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (missionHistory[key]) count++;
+        else break;
+      }
+      setStatStreak(count);
+    } catch {}
+
+    // 2. 총 분석 횟수
+    try {
+      const history = JSON.parse(
+        localStorage.getItem('sleeprescue_analysis_history') || '[]'
+      );
+      setStatAnalysis(history.length);
+    } catch {}
+
+    // 3. 평균 수면 (DB에서 불러오기)
+    try {
+      const user_idx = localStorage.getItem('user_idx');
+      if (user_idx) {
+        fetch(`http://localhost:7000/api/lifelog/latest/${user_idx}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.success && data.data?.sleep_hours) {
+              setStatSleep(`${data.data.sleep_hours}h`);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {}
+  }, []);
+
   // 알람 상태
   const [sleepAlarm, setSleepAlarm]     = useState('');  // 취침 알람 시간
   const [wakeAlarm, setWakeAlarm]       = useState('');  // 기상 알람 시간
@@ -310,11 +358,11 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
 
       {/* 수면 통계 */}
       <div className="mypage-stats-row">
-        <div className="mypage-stat-box"><div className="mypage-stat-num">7일</div><div className="mypage-stat-label">연속 달성</div></div>
+        <div className="mypage-stat-box"><div className="mypage-stat-num">{statStreak}일</div><div className="mypage-stat-label">연속 달성</div></div>
         <div className="mypage-stat-divider" />
-        <div className="mypage-stat-box"><div className="mypage-stat-num">23회</div><div className="mypage-stat-label">총 분석</div></div>
+        <div className="mypage-stat-box"><div className="mypage-stat-num">{statAnalysis}회</div><div className="mypage-stat-label">총 분석</div></div>
         <div className="mypage-stat-divider" />
-        <div className="mypage-stat-box"><div className="mypage-stat-num">6.8h</div><div className="mypage-stat-label">평균 수면</div></div>
+        <div className="mypage-stat-box"><div className="mypage-stat-num">{statSleep}</div><div className="mypage-stat-label">평균 수면</div></div>
       </div>
 
       {/* 메뉴 리스트 */}
