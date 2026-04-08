@@ -242,11 +242,16 @@ function SignUp({ goLogin, goHome }) {
       birthdate: form.birthdate, gender: form.gender,
     });
     if (data.success) {
-      goHome(form.name, form.email);
-    } else {
-      alert(data.message || '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user_idx', data.user_idx);
+      localStorage.setItem('userName', data.userName);
+      localStorage.setItem('userEmail', data.userEmail);
+      localStorage.setItem('coaching_user_id', data.user_idx); // coaching_user_id도 설정
+      goHome(data.userName, data.userEmail, data.user_idx); // goHome 인자도 백엔드 응답에 맞춰 수정
+      } else {
+        alert(data.message || '서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
+      }
     }
-  };
 
   const progressPct = step === 1 ? 50 : 100;
 

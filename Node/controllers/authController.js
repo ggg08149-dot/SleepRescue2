@@ -11,14 +11,29 @@ const signup = async (req, res) => {
   }
   try {
     const hashedPw = await bcrypt.hash(password, 10);
-    userModel.insert({ email, name, hashedPw, gender, birthdate }, (err) => {
+    userModel.insert({ email, name, hashedPw, gender, birthdate }, (err, results) => {
       if (err) {
         if (err.code === 'ER_DUP_ENTRY') return res.json({ success: false, message: '이미 사용 중인 이메일입니다.' });
         console.log('회원가입 에러:', err);
         return res.json({ success: false, message: '회원가입에 실패했습니다.' });
       }
-      res.json({ success: true, message: '회원가입 성공! 🎉' });
+      const user_idx = results.insertId;
+      const token = jwt.sign(
+        { id: user_idx, name },
+        SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.json({
+        success: true,
+        message: '회원가입 성공! 🎉',
+        token,
+        user_idx,
+        userName: name,
+        userEmail: email,
+      });
     });
+
   } catch (err) {
     console.log('서버 에러:', err);
     res.json({ success: false, message: '서버 오류가 발생했습니다.' });
