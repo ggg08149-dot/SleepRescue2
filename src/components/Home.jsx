@@ -9,11 +9,6 @@ const getFatigueEmoji = (fatigue) => {
   return { emoji: '😊', label: '양호', color: '#22c55e' };
 };
 
-const FALLBACK_HOME_MISSIONS = [
-  '오후 2시 이후 카페인 섭취 금지',
-  '취침 1시간 전 스마트폰 사용 중단',
-  '취침 전 스팀 온열 안대 10분',
-];
 
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 
@@ -135,27 +130,16 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     getPlanStatus()
       .then(planData => {
         if (planData?.hasActivePlan) {
-          return getDailyMissions(1);
+          return getDailyMissions(planData.current_day_number || 1);
         }
       })
       .then(res => {
         if (res?.success && res.missions?.length > 0) {
           setHomeMissions(res.missions.slice(0, 3).map(m => extractTitle(m.plan_task)));
-        } else {
-          const cached = JSON.parse(localStorage.getItem('last_gpt_coaching') || '{}');
-          if (cached.solutions?.length > 0) {
-            setHomeMissions(cached.solutions.slice(0, 3).map(extractTitle));
-          }
         }
+        // 미션 없으면 homeMissions null 유지 → "측정을 진행해주세요" 표시
       })
-      .catch(() => {
-        try {
-          const cached = JSON.parse(localStorage.getItem('last_gpt_coaching') || '{}');
-          if (cached.solutions?.length > 0) {
-            setHomeMissions(cached.solutions.slice(0, 3).map(extractTitle));
-          }
-        } catch {}
-      });
+      .catch(() => {});
 
     // DB 데이터 fetch
     getLatestFatigue(user_idx)
@@ -168,6 +152,18 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       .then(res => { if (res.success && res.data) setLatestLifelog(res.data); })
       .catch(() => {});
   }, [analysisResult]);
+
+  // 코칭탭 체크 변경 시 동기화 (storage 이벤트)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === `mission_checks_${todayKey}`) {
+        try { setMissionChecks(JSON.parse(e.newValue) || [false, false, false]); }
+        catch {}
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [todayKey]);
 
   // 캘린더 fetch
   useEffect(() => {
@@ -223,8 +219,14 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     next[idx] = !next[idx];
     setMissionChecks(next);
     setMissionSaved(false);
-    localStorage.setItem(`mission_checks_${todayKey}`, JSON.stringify(next));
+    const val = JSON.stringify(next);
+    localStorage.setItem(`mission_checks_${todayKey}`, val);
     localStorage.removeItem(`mission_saved_${todayKey}`);
+    // 같은 탭 내 코칭탭 동기화 (storage 이벤트는 타 탭에서만 발동하므로 수동 dispatch)
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: `mission_checks_${todayKey}`,
+      newValue: val,
+    }));
   };
 
   const saveMissions = () => {

@@ -130,3 +130,26 @@ exports.toggleMissionCheck = (req, res) => {
   const { detail_idx, is_completed } = req.body;
   planModel.updateMissionStatus(detail_idx, is_completed ? 1 : 0, (err) => res.json({ success: !err }));
 };
+
+// 5. 활성 플랜의 전체 미션 일괄 조회
+exports.getAllMissions = (req, res) => {
+  const user_idx = req.user.id;
+  planModel.getActivePlanWithDay(user_idx, (err, results) => {
+    if (err || results.length === 0) return res.json({ success: false, message: "플랜 없음" });
+    const plan = results[0];
+    planModel.getAllMissions(plan.plan_idx, (err2, missions) => {
+      if (err2) return res.status(500).json({ success: false });
+      // day_number별로 그룹핑 + type 라벨 부여
+      const byDay = {};
+      missions.forEach(m => {
+        if (!byDay[m.day_number]) byDay[m.day_number] = [];
+        const idx = byDay[m.day_number].length;
+        byDay[m.day_number].push({
+          ...m,
+          type: idx < 3 ? '필수' : idx === 3 ? '선택' : '권장',
+        });
+      });
+      res.json({ success: true, missions_by_day: byDay });
+    });
+  });
+};

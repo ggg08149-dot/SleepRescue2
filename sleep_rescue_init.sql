@@ -31,6 +31,7 @@ CREATE TABLE tb_plan (
   user_idx INT NOT NULL,
   plan_type INT,
   start_date DATETIME,
+  status VARCHAR(20) DEFAULT 'active',
   FOREIGN KEY (user_idx) REFERENCES tb_user(user_idx)
 );
 
@@ -41,6 +42,8 @@ CREATE TABLE tb_plan_detail (
   day_number INT,
   plan_task TEXT,
   is_completed BOOLEAN DEFAULT FALSE,
+  is_ai_generated TINYINT(1) DEFAULT 0,
+  daily_analysis TEXT DEFAULT NULL,
   created_at DATETIME DEFAULT NOW(),
   FOREIGN KEY (plan_idx) REFERENCES tb_plan(plan_idx),
   FOREIGN KEY (user_idx) REFERENCES tb_user(user_idx)

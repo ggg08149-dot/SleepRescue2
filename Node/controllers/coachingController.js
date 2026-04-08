@@ -83,7 +83,8 @@ const getGptCoaching = (req, res) => {
  * [수정] 사용자가 '재측정 결과 반영(B안)'을 승인했을 때 호출되는 API
  */
 const applyOptimization = (req, res) => {
-  const { user_idx, solutions, analysis = "" } = req.body;
+  const user_idx = req.user?.id || req.body?.user_idx;
+  const { solutions, analysis = "" } = req.body;
 
   // 1. 오전 7시 기준, 오늘이 몇 일차인지 포함된 플랜 정보 가져오기
   planModel.getActivePlanWithDay(user_idx, (err, planResult) => {

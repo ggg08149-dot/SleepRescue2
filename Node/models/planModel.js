@@ -6,8 +6,11 @@ const db = require('../config/db');
 
 // 1. 새로운 플랜 시작
 exports.createPlan = (user_idx, plan_type, cb) => {
-  const sql = `INSERT INTO tb_plan (user_idx, plan_type, start_date) VALUES (?, ?, NOW())`;
-  db.query(sql, [user_idx, plan_type], cb);
+  db.query('UPDATE tb_plan SET status = ? WHERE user_idx = ? AND status = ?', ['inactive', user_idx, 'active'], (err) => {
+    if (err) return cb(err);
+    const sql = `INSERT INTO tb_plan (user_idx, plan_type, start_date, status) VALUES (?, ?, NOW(), 'active')`;
+    db.query(sql, [user_idx, plan_type], cb);
+  });
 };
 
 // 2. 현재 활성 플랜 및 일차(day_number) 계산
@@ -50,4 +53,10 @@ exports.saveDailyMissions = (plan_idx, user_idx, day_number, missions, analysis,
 exports.updateMissionStatus = (detail_idx, is_completed, cb) => {
   const sql = `UPDATE tb_plan_detail SET is_completed = ? WHERE detail_idx = ?`;
   db.query(sql, [is_completed, detail_idx], cb);
+};
+
+// 6. 활성 플랜의 전체 미션 일괄 조회
+exports.getAllMissions = (plan_idx, cb) => {
+  const sql = `SELECT * FROM tb_plan_detail WHERE plan_idx = ? ORDER BY day_number, detail_idx`;
+  db.query(sql, [plan_idx], cb);
 };

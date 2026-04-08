@@ -301,9 +301,9 @@ function AnalysisResult({ currentResult, existingResult, userName, startCoaching
   // ✅ 먼저 즉시 이동!
   startCoaching(planN);
 
-  // ✅ 저장은 백그라운드에서 (기다리지 않음)
-  if (userIdx) {
-    savePlan(userIdx, planN).catch(e => console.error('플랜 저장 실패:', e));
+  // ✅ 활성 플랜 없을 때만 신규 생성 (기존 플랜 진행 중이면 이어서 진행)
+  if (!isPlanActive) {
+    startPlan(planN).catch(e => console.error('플랜 저장 실패:', e));
   }
 };
 

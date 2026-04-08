@@ -39,6 +39,17 @@ export const getDailyMissions = async (day) => {
 };
 
 /**
+ * [통합 API] 활성 플랜 전체 미션 일괄 조회
+ */
+export const getAllPlanMissions = async () => {
+  const token = localStorage.getItem('token');
+  const response = await axios.get(`${API_URL}/all-missions`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+/**
  * [통합 API] 미션 체크 상태 업데이트
  */
 export const updateMissionCheck = async (detailIdx, isCompleted) => {

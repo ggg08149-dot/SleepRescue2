@@ -15,4 +15,7 @@ router.get('/daily/:day', verifyToken, planController.getDailyMissions);
 // 4. 미션 완료 체크/해제하기 (Coaching -> /api/plan/check)
 router.put('/check', verifyToken, planController.toggleMissionCheck);
 
+// 5. 활성 플랜 전체 미션 일괄 조회 (Coaching -> /api/plan/all-missions)
+router.get('/all-missions', verifyToken, planController.getAllMissions);
+
 module.exports = router;
