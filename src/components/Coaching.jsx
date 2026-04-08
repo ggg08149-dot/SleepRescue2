@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { getPlanStatus } from '../api/planApi';
-import { getCalendarFatigue } from '../api/fatigueApi';
 
 const PLAN_MISSIONS = {
   1: [
@@ -99,6 +97,61 @@ const getAiReason = (idx, analysisResult) => {
   return '';
 };
 
+// ─── 로딩 단계 표시 컴포넌트 ────────────────────
+function LoadingSteps() {
+  const [step, setStep] = React.useState(0);
+  const steps = [
+    { icon: '👁', text: '다크서클 데이터 분석 중...' },
+    { icon: '🌙', text: '수면 패턴 파악 중...' },
+    { icon: '🧠', text: 'AI 미션 생성 중...' },
+    { icon: '🚑', text: '맞춤 플랜 완성 중...' },
+  ];
+
+  React.useEffect(() => {
+    const id = setInterval(() => setStep(s => (s + 1) % steps.length), 900);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: '10px',
+      width: '240px',
+    }}>
+      {steps.map((s, i) => (
+        <div key={i} style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '10px 16px', borderRadius: '12px',
+          background: step === i ? 'rgba(110,231,247,0.1)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${step === i ? 'rgba(110,231,247,0.3)' : 'rgba(255,255,255,0.06)'}`,
+          transition: 'all 0.3s ease',
+          opacity: step === i ? 1 : 0.35,
+        }}>
+          <span style={{ fontSize: '18px' }}>{s.icon}</span>
+          <span style={{
+            fontSize: '12px',
+            color: step === i ? 'var(--accent)' : 'rgba(255,255,255,0.4)',
+            fontFamily: "'Noto Sans KR', sans-serif",
+            fontWeight: step === i ? 700 : 400,
+            transition: 'all 0.3s',
+          }}>{s.text}</span>
+          {step === i && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
+              {[0,1,2].map(d => (
+                <div key={d} style={{
+                  width: '4px', height: '4px', borderRadius: '50%',
+                  background: 'var(--accent)',
+                  animation: `dot 1s ease-in-out ${d * 0.2}s infinite alternate`,
+                }} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <style>{`@keyframes dot { from{opacity:0.3;transform:scale(0.8)} to{opacity:1;transform:scale(1.2)} }`}</style>
+    </div>
+  );
+}
+
 function SoundWave() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '16px' }}>
@@ -127,39 +180,16 @@ const PLAN_INFO = {
 };
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
-  // 홈탭과 공유하는 오늘 날짜 키
-  const todayKey = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  })();
-
   const [activePlan, setActivePlan]     = useState(initialPlan);
   const [gptSolutions, setGptSolutions] = useState([]);
   const [gptAnalysis, setGptAnalysis]   = useState("");
   const [loadingGpt, setLoadingGpt]     = useState(false);
   const [activeDay, setActiveDay]       = useState(1);
 
-  // 플랜 상태 (날짜 기반 해금용)
-  const [planStatus, setPlanStatus]     = useState(null);
-  // 캘린더 측정 데이터 { "YYYY-MM-DD": true }
-  const [calendarData, setCalendarData] = useState({});
-
-  // 홈탭 상위 3개 미션과 공유 (localStorage 동기화)
-  const [homeMissionChecks, setHomeMissionChecks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`mission_checks_${todayKey}`)) || [false, false, false]; }
-    catch { return [false, false, false]; }
-  });
-
-  // 정적 미션 체크 상태 (localStorage 유지)
-  const [checks, setChecks]             = useState(() => {
-    try { return JSON.parse(localStorage.getItem('coaching_checks')) || {}; }
-    catch { return {}; }
-  });
-  // GPT 솔루션 체크 상태 (localStorage 유지)
-  const [gptChecks, setGptChecks]       = useState(() => {
-    try { return JSON.parse(localStorage.getItem('coaching_gpt_checks')) || {}; }
-    catch { return {}; }
-  });
+  // ✅ 정적 미션 체크 상태
+  const [checks, setChecks]             = useState({});
+  // ✅ GPT 솔루션 체크 상태 (플랜+일차별 분리)
+  const [gptChecks, setGptChecks]       = useState({});
 
   const [playingIdx, setPlayingIdx]     = useState(null);
   const [volume, setVolume]             = useState(0.5);
@@ -167,45 +197,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [timeLeft, setTimeLeft]         = useState(null);
   const audioRef = useRef(null);
   const timerRef = useRef(null);
-
-  // 플랜 상태 + 캘린더 데이터 로드
-  useEffect(() => {
-    const userIdx = localStorage.getItem('user_idx');
-    if (!userIdx) return;
-
-    getPlanStatus()
-      .then(data => {
-        if (data?.hasActivePlan) {
-          setPlanStatus(data);
-          setActivePlan(data.plan_type);
-          setActiveDay(data.current_day_number);
-
-          const now = new Date();
-          getCalendarFatigue(userIdx, now.getFullYear(), now.getMonth() + 1)
-            .then(res => {
-              if (res?.success && res.data) {
-                const measured = {};
-                res.data.forEach(item => {
-                  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(item.day).padStart(2,'0')}`;
-                  measured[dateStr] = true;
-                });
-                setCalendarData(measured);
-              }
-            })
-            .catch(() => {});
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // checks/gptChecks 변경 시 localStorage 저장
-  useEffect(() => {
-    localStorage.setItem('coaching_checks', JSON.stringify(checks));
-  }, [checks]);
-
-  useEffect(() => {
-    localStorage.setItem('coaching_gpt_checks', JSON.stringify(gptChecks));
-  }, [gptChecks]);
 
   const aiRecommended = getAiRecommended(analysisResult);
 
@@ -220,16 +211,10 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const dayKey        = `plan${activePlan}_day${activeDay}`;
   const dayChecks     = checks[dayKey] || {};
 
-  // D1 상위 3개는 홈탭과 공유된 homeMissionChecks 사용
-  const getMissionChecked = (missionId) => {
-    if (activeDay === 1 && missionId <= 3) return homeMissionChecks[missionId - 1] || false;
-    return dayChecks[missionId] || false;
-  };
-
   const totalMissions = useGpt ? gptSolutions.length : currentDay.missions.length;
   const doneMissions  = useGpt
     ? Object.values(dayGptChecks).filter(Boolean).length
-    : currentDay.missions.filter(m => getMissionChecked(m.id)).length;
+    : Object.values(dayChecks).filter(Boolean).length;
   const progressPct   = totalMissions > 0 ? Math.round((doneMissions / totalMissions) * 100) : 0;
 
   // ✅ 전체 플랜 진행률
@@ -243,11 +228,8 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           return s + Object.values(gptChecks[k] || {}).filter(Boolean).length;
         }, 0)
       : planDays.reduce((s, d) => {
-          const dChecks = checks[`plan${activePlan}_day${d.day}`] || {};
-          return s + d.missions.filter(m => {
-            if (d.day === 1 && m.id <= 3) return homeMissionChecks[m.id - 1] || false;
-            return dChecks[m.id] || false;
-          }).length;
+          const k = `plan${activePlan}_day${d.day}`;
+          return s + Object.values(checks[k] || {}).filter(Boolean).length;
         }, 0);
     return totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
   })();
@@ -331,17 +313,9 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const formatTime = (sec) => `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
 
-  // ✅ 정적 미션 체크 토글 (D1 상위 3개는 홈탭과 공유)
+  // ✅ 정적 미션 체크 토글
   const toggleCheck = (missionId) => {
-    if (activeDay === 1 && missionId <= 3) {
-      const next = [...homeMissionChecks];
-      next[missionId - 1] = !next[missionId - 1];
-      setHomeMissionChecks(next);
-      localStorage.setItem(`mission_checks_${todayKey}`, JSON.stringify(next));
-      localStorage.removeItem(`mission_saved_${todayKey}`);
-    } else {
-      setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
-    }
+    setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
   };
 
   // ✅ GPT 솔루션 체크 토글
@@ -351,28 +325,17 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   const handlePlanChange = (plan) => { setActivePlan(plan); setActiveDay(1); };
 
-  // ✅ 해금 조건: 날짜 기반 (start_date + 경과일 >= day)
+  // ✅ 잠금 해제 조건 (GPT/정적 둘 다 지원)
   const isUnlocked = (day) => {
-    if (!planStatus) return day === 1;
-    return day <= planStatus.current_day_number;
-  };
-
-  // ✅ 해당 일차에 측정 기록 있는지 확인
-  const hasMeasurement = (day) => {
-    if (!planStatus?.start_date) return false;
-    const start = new Date(planStatus.start_date);
-    start.setHours(0, 0, 0, 0);
-    const target = new Date(start);
-    target.setDate(target.getDate() + (day - 1));
-    const dateStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
-    return !!calendarData[dateStr];
-  };
-
-  // 오늘(현재 진행중인 날)은 항상 미션 표시, 지난 날은 측정 기록 있을 때만
-  const showMissions = (day) => {
-    if (!planStatus) return true;
-    if (day === planStatus.current_day_number) return true;
-    return hasMeasurement(day);
+    if (day === 1) return true;
+    if (useGpt) {
+      const k = `gpt_p${activePlan}_d${day - 1}`;
+      return Object.values(gptChecks[k] || {}).filter(Boolean).length === gptSolutions.length && gptSolutions.length > 0;
+    } else {
+      const k = `plan${activePlan}_day${day - 1}`;
+      const prev = planDays.find(d => d.day === day - 1);
+      return prev ? Object.values(checks[k] || {}).filter(Boolean).length === prev.missions.length && prev.missions.length > 0 : true;
+    }
   };
 
   // ✅ 날짜 완료 여부
@@ -381,13 +344,9 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       const k = `gpt_p${activePlan}_d${day}`;
       return gptSolutions.length > 0 && Object.values(gptChecks[k] || {}).filter(Boolean).length === gptSolutions.length;
     } else {
+      const k = `plan${activePlan}_day${day}`;
       const d = planDays.find(pd => pd.day === day);
-      if (!d) return false;
-      const dChecks = checks[`plan${activePlan}_day${day}`] || {};
-      return d.missions.every(m => {
-        if (day === 1 && m.id <= 3) return homeMissionChecks[m.id - 1] || false;
-        return dChecks[m.id] || false;
-      });
+      return d ? Object.values(checks[k] || {}).filter(Boolean).length === d.missions.length && d.missions.length > 0 : false;
     }
   };
 
@@ -402,38 +361,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   return (
     <div className="coaching-screen">
 
-      {/* AI 코칭 분석 요약 */}
-      {gptAnalysis && (
-        <div className="coaching-card" style={{ border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.05)', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>📢</span>
-            <p style={{ fontSize: '13px', color: '#e2e8f0', margin: 0, lineHeight: '1.5', wordBreak: 'keep-all' }}>{gptAnalysis}</p>
-          </div>
-        </div>
-      )}
 
-      {/* AI 맞춤 솔루션 */}
-      <div className="section-title" style={{ color: '#6ee7f7' }}>🤖 AI 맞춤 수면 솔루션</div>
-      <div className="coaching-card" style={{ border: '1px solid rgba(110,231,247,0.3)', background: 'rgba(110,231,247,0.05)', marginBottom: '25px' }}>
-        {loadingGpt ? (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>AI가 수면 데이터를 분석 중입니다...</p>
-          </div>
-        ) : gptSolutions.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {gptSolutions.map((solution, index) => (
-              <div key={index} style={{ fontSize: '13px', color: '#fff', display: 'flex', gap: '8px' }}>
-                <span style={{ color: '#6ee7f7' }}>•</span>
-                {solution}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: 'var(--muted)', fontSize: '12px', textAlign: 'center' }}>
-            데이터를 분석할 수 없습니다. 수면 기록을 먼저 등록해 주세요.
-          </p>
-        )}
-      </div>
 
       {/* 플랜 선택 */}
       <div className="section-title">수면 코칭 플랜 선택</div>
@@ -497,8 +425,85 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         </div>
       </div>
 
+      {/* 수면구조대 풀스크린 로딩 */}
+      {loadingGpt && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9000,
+          background: 'linear-gradient(135deg, #0b0b13, #1a0a2e)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          padding: '40px',
+        }}>
+          {/* 앰뷸런스 아이콘 */}
+          <div style={{
+            fontSize: '72px', marginBottom: '24px',
+            animation: 'ambulance 0.8s ease-in-out infinite alternate',
+            filter: 'drop-shadow(0 0 20px rgba(239,68,68,0.5))',
+          }}>🚑</div>
+
+          {/* 타이틀 */}
+          <div style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '28px', color: 'var(--accent)',
+            letterSpacing: '3px', marginBottom: '8px',
+            textAlign: 'center',
+          }}>
+            수면구조대 출동 중
+          </div>
+
+          {/* 서브 텍스트 */}
+          <div style={{
+            fontSize: '14px', color: 'rgba(255,255,255,0.5)',
+            marginBottom: '40px', textAlign: 'center', lineHeight: 1.8,
+            fontFamily: "'Noto Sans KR', sans-serif",
+          }}>
+            AI가 맞춤 미션을 분석하고 있어요
+          </div>
+
+          {/* 단계별 진행 표시 */}
+          <LoadingSteps />
+
+          {/* 진행 바 */}
+          <div style={{
+            width: '240px', height: '4px',
+            background: 'rgba(255,255,255,0.07)',
+            borderRadius: '4px', overflow: 'hidden',
+            marginTop: '32px',
+          }}>
+            <div style={{
+              height: '100%',
+              background: 'linear-gradient(90deg, var(--accent), #a78bfa)',
+              borderRadius: '4px',
+              animation: 'loadbar 2s ease-in-out infinite',
+            }} />
+          </div>
+
+          <style>{`
+            @keyframes ambulance {
+              from { transform: translateX(-8px) rotate(-5deg); }
+              to   { transform: translateX(8px) rotate(5deg); }
+            }
+            @keyframes loadbar {
+              0%   { width: 0%;   margin-left: 0; }
+              50%  { width: 70%;  margin-left: 0; }
+              100% { width: 0%;   margin-left: 100%; }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* 미션 체크리스트 */}
-      <div className="section-title">DAY {activeDay} — {currentDay.title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <div className="section-title" style={{ margin: 0 }}>DAY {activeDay} 미션</div>
+        {useGpt && (
+          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700, background: 'rgba(167,139,250,0.2)', border: '1px solid rgba(167,139,250,0.4)', color: 'var(--accent2)' }}>
+            🤖 AI 맞춤
+          </span>
+        )}
+        {loadingGpt && (
+          <span style={{ fontSize: '10px', color: 'var(--muted)' }}>생성 중...</span>
+        )}
+      </div>
       <div className="coaching-card">
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
           <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(110,231,247,0.08)', border: '1px solid rgba(110,231,247,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>{char.emoji}</div>
@@ -513,18 +518,10 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           </div>
         </div>
 
+
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {!showMissions(activeDay) ? (
-            // ✅ 지난 날 측정 기록 없음 → 동기부여 메시지
-            <div style={{ padding: '20px 16px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px' }}>
-              <div style={{ fontSize: '28px', marginBottom: '10px' }}>📭</div>
-              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, marginBottom: '6px' }}>이날 측정 기록이 없어요</div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', lineHeight: '1.6' }}>
-                꾸준함이 수면을 바꿉니다 💪<br />
-                오늘부터 다시 시작해도 늦지 않아요!
-              </div>
-            </div>
-          ) : useGpt ? (
+          {useGpt ? (
             // ✅ GPT 솔루션 → 체크리스트로 표시
             gptSolutions.map((solution, idx) => {
               const isChecked = dayGptChecks[idx] || false;
@@ -550,7 +547,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           ) : (
             // ✅ GPT 없을 때 → PLAN_MISSIONS 고정 표시
             currentDay.missions.map(mission => {
-              const isChecked = getMissionChecked(mission.id);
+              const isChecked = dayChecks[mission.id] || false;
               const tc = TYPE_COLOR[mission.type];
               return (
                 <div key={mission.id} onClick={() => toggleCheck(mission.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 12px', background: isChecked ? 'rgba(110,231,247,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isChecked ? 'rgba(110,231,247,0.25)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}>
