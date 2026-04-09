@@ -109,4 +109,15 @@ const changePassword = async (req, res) => {
   });
 };
 
-module.exports = { signup, login, authCheck, verifyPassword, changePassword };
+const withdrawUser = (req, res) => {
+  const user_idx = req.user.id;
+  userModel.deleteUser(user_idx, (err) => {
+    if (err) {
+      console.error('회원탈퇴 오류:', err);
+      return res.status(500).json({ success: false, message: '탈퇴 처리 중 오류가 발생했습니다.' });
+    }
+    res.json({ success: true, message: '회원탈퇴가 완료되었습니다.' });
+  });
+};
+
+module.exports = { signup, login, authCheck, verifyPassword, changePassword, withdrawUser };

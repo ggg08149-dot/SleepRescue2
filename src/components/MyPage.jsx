@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { withdrawUser } from '../api/authApi';
 
 const LOCK_KEY  = 'sleeprescue_lock_until';
 const ALARM_KEY = 'sleeprescue_alarms';
@@ -630,7 +631,22 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
             <div className="mypage-modal-sub">모든 수면 데이터와 코칭 기록이<br />영구적으로 삭제됩니다.</div>
             <div className="mypage-modal-btns">
               <button className="mypage-modal-cancel" onClick={() => setShowWithdraw(false)}>취소</button>
-              <button className="mypage-modal-confirm" onClick={() => { setShowWithdraw(false); showToast('탈퇴 처리되었습니다'); }}>탈퇴하기</button>
+              <button className="mypage-modal-confirm" onClick={async () => {
+                try {
+                  const res = await withdrawUser();
+                  if (res.success) {
+                    setShowWithdraw(false);
+                    localStorage.clear();
+                    onLogout();
+                  } else {
+                    setShowWithdraw(false);
+                    showToast(res.message || '탈퇴 처리 중 오류가 발생했습니다.');
+                  }
+                } catch {
+                  setShowWithdraw(false);
+                  showToast('서버 오류가 발생했습니다.');
+                }
+              }}>탈퇴하기</button>
             </div>
           </div>
         </div>

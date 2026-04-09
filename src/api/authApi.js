@@ -41,3 +41,13 @@ export const changePassword = async (currentPassword, newPassword) => {
   });
   return res.json();
 };
+
+export const withdrawUser = async () => {
+  const res = await fetch(`${BASE}/api/user/withdraw`, {
+    method : 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    },
+  });
+  return res.json();
+};
