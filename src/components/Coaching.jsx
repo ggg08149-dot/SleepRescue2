@@ -274,11 +274,8 @@ const PLAN_INFO = {
 };
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
-<<<<<<< HEAD
-=======
   // 홈탭과 공유하는 오늘 날짜 키
   const userIdx = localStorage.getItem('user_idx') || 'guest';
->>>>>>> origin/KTY
   const todayKey = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -296,14 +293,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
     try { return JSON.parse(localStorage.getItem(`mission_checks_${userIdx}_${todayKey}`)) || [false, false, false]; }
     catch { return [false, false, false]; }
   });
-<<<<<<< HEAD
-  const [checks, setChecks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('coaching_checks')) || {}; }
-    catch { return {}; }
-  });
-  const [gptChecks, setGptChecks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('coaching_gpt_checks')) || {}; }
-=======
 
   // 정적 미션 체크 상태 (localStorage 유지)
   const [checks, setChecks]             = useState(() => {
@@ -313,7 +302,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   // GPT 솔루션 체크 상태 (localStorage 유지)
   const [gptChecks, setGptChecks]       = useState(() => {
     try { return JSON.parse(localStorage.getItem(`coaching_gpt_checks_${userIdx}`)) || {}; }
->>>>>>> origin/KTY
     catch { return {}; }
   });
 
@@ -341,12 +329,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       .catch(() => {});
   }, []);
 
-<<<<<<< HEAD
-  useEffect(() => { localStorage.setItem('coaching_checks', JSON.stringify(checks)); }, [checks]);
-  useEffect(() => { localStorage.setItem('coaching_gpt_checks', JSON.stringify(gptChecks)); }, [gptChecks]);
-
-  useEffect(() => {
-=======
   // checks/gptChecks 변경 시 localStorage 저장
   useEffect(() => {
     localStorage.setItem(`coaching_checks_${userIdx}`, JSON.stringify(checks));
@@ -358,7 +340,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   // planStatus 로드 후 전체 미션 일괄 조회
   useEffect(() => {
->>>>>>> origin/KTY
     if (!planStatus) return;
     let isMounted = true;
     setLoadingMissions(true);
@@ -392,14 +373,9 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   useEffect(() => {
     const handler = (e) => {
-<<<<<<< HEAD
-      if (e.key === `mission_checks_${todayKey}`) {
-        try { setHomeMissionChecks(JSON.parse(e.newValue) || [false, false, false]); } catch {}
-=======
       if (e.key === `mission_checks_${userIdx}_${todayKey}`) {
         try { setHomeMissionChecks(JSON.parse(e.newValue) || [false, false, false]); }
         catch {}
->>>>>>> origin/KTY
       }
     };
     window.addEventListener('storage', handler);
@@ -428,12 +404,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       }
       setLoadingGpt(true); setGptFetchError(false);
       try {
-<<<<<<< HEAD
-        const userIdx  = localStorage.getItem('user_idx') || "1008";
-        const token    = localStorage.getItem('token');
-=======
         const token = localStorage.getItem('token');
->>>>>>> origin/KTY
         const response = await axios.post('http://localhost:7000/api/coaching/analyze',
           { user_idx: parseInt(userIdx) },
           { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
@@ -477,11 +448,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       next[missionId - 1] = !next[missionId - 1];
       setHomeMissionChecks(next);
       const val = JSON.stringify(next);
-<<<<<<< HEAD
-      localStorage.setItem(`mission_checks_${todayKey}`, val);
-      localStorage.removeItem(`mission_saved_${todayKey}`);
-      window.dispatchEvent(new StorageEvent('storage', { key: `mission_checks_${todayKey}`, newValue: val }));
-=======
       localStorage.setItem(`mission_checks_${userIdx}_${todayKey}`, val);
       localStorage.removeItem(`mission_saved_${userIdx}_${todayKey}`);
       // 같은 탭 내 홈탭 동기화 (storage 이벤트는 타 탭에서만 발동하므로 수동 dispatch)
@@ -489,7 +455,6 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
         key: `mission_checks_${userIdx}_${todayKey}`,
         newValue: val,
       }));
->>>>>>> origin/KTY
     } else {
       setChecks(prev => ({ ...prev, [dayKey]: { ...(prev[dayKey] || {}), [missionId]: !(prev[dayKey]?.[missionId]) } }));
     }
