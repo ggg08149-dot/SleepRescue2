@@ -412,7 +412,6 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
       </div>
 
       {/* 주간 피로지수 */}
-      <div className="section-title">주간 피로지수</div>
       <div className="charts-grid">
         <div className="stat-card">
           <div className="stat-label">최근 피로도</div>
