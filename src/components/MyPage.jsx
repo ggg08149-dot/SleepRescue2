@@ -180,10 +180,11 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
 
   // 통계 불러오기 (localStorage 기반)
   useEffect(() => {
+    const userIdx = localStorage.getItem('user_idx') || 'guest';
     // 1. 연속 달성 streak
     try {
       const missionHistory = JSON.parse(
-        localStorage.getItem('sleeprescue_mission_history') || '{}'
+        localStorage.getItem(`sleeprescue_mission_history_${userIdx}`) || '{}'
       );
       let count = 0;
       const now = new Date();
@@ -200,7 +201,7 @@ function MyPage({ userName = '사용자', userEmail = 'user@email.com', userId =
     // 2. 총 분석 횟수
     try {
       const history = JSON.parse(
-        localStorage.getItem('sleeprescue_analysis_history') || '[]'
+        localStorage.getItem(`sleeprescue_analysis_history_${userIdx}`) || '[]'
       );
       setStatAnalysis(history.length);
     } catch {}

@@ -60,16 +60,17 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   const [streak, setStreak]               = useState(0);
   const [analysisCount, setAnalysisCount] = useState(0);
   const [homeMissions, setHomeMissions]   = useState(null);
+  const userIdx = localStorage.getItem('user_idx') || 'guest';
   const todayKey = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   })();
   const [missionChecks, setMissionChecks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`mission_checks_${todayKey}`)) || [false, false, false]; }
+    try { return JSON.parse(localStorage.getItem(`mission_checks_${userIdx}_${todayKey}`)) || [false, false, false]; }
     catch { return [false, false, false]; }
   });
   const [missionSaved, setMissionSaved] = useState(() => {
-    return localStorage.getItem(`mission_saved_${todayKey}`) === 'true';
+    return localStorage.getItem(`mission_saved_${userIdx}_${todayKey}`) === 'true';
   });
 
   const today = new Date();
@@ -99,7 +100,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     // localStorage에서 분석 횟수 읽기
     try {
       const history = JSON.parse(
-        localStorage.getItem('sleeprescue_analysis_history') || '[]'
+        localStorage.getItem(`sleeprescue_analysis_history_${userIdx}`) || '[]'
       );
       setAnalysisCount(history.length);
     } catch (e) {}
@@ -107,7 +108,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     // 연속 달성 streak 계산
     try {
       const missionHistory = JSON.parse(
-        localStorage.getItem('sleeprescue_mission_history') || '{}'
+        localStorage.getItem(`sleeprescue_mission_history_${userIdx}`) || '{}'
       );
       let count = 0;
       const now = new Date();
@@ -156,7 +157,7 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
   // 코칭탭 체크 변경 시 동기화 (storage 이벤트)
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === `mission_checks_${todayKey}`) {
+      if (e.key === `mission_checks_${userIdx}_${todayKey}`) {
         try { setMissionChecks(JSON.parse(e.newValue) || [false, false, false]); }
         catch {}
       }
@@ -220,23 +221,23 @@ function Home({ goAnalyze, analysisResult, startCoaching, userName = '사용자'
     setMissionChecks(next);
     setMissionSaved(false);
     const val = JSON.stringify(next);
-    localStorage.setItem(`mission_checks_${todayKey}`, val);
-    localStorage.removeItem(`mission_saved_${todayKey}`);
+    localStorage.setItem(`mission_checks_${userIdx}_${todayKey}`, val);
+    localStorage.removeItem(`mission_saved_${userIdx}_${todayKey}`);
     // 같은 탭 내 코칭탭 동기화 (storage 이벤트는 타 탭에서만 발동하므로 수동 dispatch)
     window.dispatchEvent(new StorageEvent('storage', {
-      key: `mission_checks_${todayKey}`,
+      key: `mission_checks_${userIdx}_${todayKey}`,
       newValue: val,
     }));
   };
 
   const saveMissions = () => {
     setMissionSaved(true);
-    localStorage.setItem(`mission_saved_${todayKey}`, 'true');
+    localStorage.setItem(`mission_saved_${userIdx}_${todayKey}`, 'true');
     if (missionChecks.every(Boolean)) {
       // 오늘 날짜로 미션 완료 저장
-      const history = JSON.parse(localStorage.getItem('sleeprescue_mission_history') || '{}');
+      const history = JSON.parse(localStorage.getItem(`sleeprescue_mission_history_${userIdx}`) || '{}');
       history[todayKey] = true;
-      localStorage.setItem('sleeprescue_mission_history', JSON.stringify(history));
+      localStorage.setItem(`sleeprescue_mission_history_${userIdx}`, JSON.stringify(history));
       setStreak(prev => prev + 1);
     }
   };

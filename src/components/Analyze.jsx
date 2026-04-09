@@ -67,7 +67,7 @@ function Analyze({ backHome, updateResult, startCoaching, userName = '사용자'
           { user_idx: userIdx, solutions, analysis: comparison_analysis || "" },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
-        localStorage.removeItem('last_gpt_coaching');
+        localStorage.removeItem(`last_gpt_coaching_${userIdx}`);
         // 상태 변화가 클 때만 추가 알림
         if (is_critical) {
           alert(`⚠️ 상태 변화 감지 (차이: ${delta_score}점)\n오늘의 미션이 현재 상태에 맞춰 재설정되었습니다.`);

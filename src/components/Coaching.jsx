@@ -182,6 +182,7 @@ const PLAN_INFO = {
 
 function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   // 홈탭과 공유하는 오늘 날짜 키
+  const userIdx = localStorage.getItem('user_idx') || 'guest';
   const todayKey = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -198,18 +199,18 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   const [planStatus, setPlanStatus]     = useState(null);
   // 홈탭 상위 3개 미션과 공유 (localStorage 동기화)
   const [homeMissionChecks, setHomeMissionChecks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`mission_checks_${todayKey}`)) || [false, false, false]; }
+    try { return JSON.parse(localStorage.getItem(`mission_checks_${userIdx}_${todayKey}`)) || [false, false, false]; }
     catch { return [false, false, false]; }
   });
 
   // 정적 미션 체크 상태 (localStorage 유지)
   const [checks, setChecks]             = useState(() => {
-    try { return JSON.parse(localStorage.getItem('coaching_checks')) || {}; }
+    try { return JSON.parse(localStorage.getItem(`coaching_checks_${userIdx}`)) || {}; }
     catch { return {}; }
   });
   // GPT 솔루션 체크 상태 (localStorage 유지)
   const [gptChecks, setGptChecks]       = useState(() => {
-    try { return JSON.parse(localStorage.getItem('coaching_gpt_checks')) || {}; }
+    try { return JSON.parse(localStorage.getItem(`coaching_gpt_checks_${userIdx}`)) || {}; }
     catch { return {}; }
   });
 
@@ -240,11 +241,11 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
 
   // checks/gptChecks 변경 시 localStorage 저장
   useEffect(() => {
-    localStorage.setItem('coaching_checks', JSON.stringify(checks));
+    localStorage.setItem(`coaching_checks_${userIdx}`, JSON.stringify(checks));
   }, [checks]);
 
   useEffect(() => {
-    localStorage.setItem('coaching_gpt_checks', JSON.stringify(gptChecks));
+    localStorage.setItem(`coaching_gpt_checks_${userIdx}`, JSON.stringify(gptChecks));
   }, [gptChecks]);
 
   // planStatus 로드 후 전체 미션 일괄 조회
@@ -293,7 +294,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   // 홈탭 체크 변경 시 동기화 (storage 이벤트)
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === `mission_checks_${todayKey}`) {
+      if (e.key === `mission_checks_${userIdx}_${todayKey}`) {
         try { setHomeMissionChecks(JSON.parse(e.newValue) || [false, false, false]); }
         catch {}
       }
@@ -344,7 +345,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
   useEffect(() => {
     let isMounted = true;
     const fetchGptCoaching = async () => {
-      const cachedData = localStorage.getItem('last_gpt_coaching');
+      const cachedData = localStorage.getItem(`last_gpt_coaching_${userIdx}`);
       const analysisId = analysisResult ? JSON.stringify(analysisResult) : 'no_data';
       if (cachedData) {
         try {
@@ -359,8 +360,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       setLoadingGpt(true);
       setGptFetchError(false);
       try {
-        const userIdx = localStorage.getItem('user_idx') || "1008";
-        const token   = localStorage.getItem('token');
+        const token = localStorage.getItem('token');
         const response = await axios.post('http://localhost:7000/api/coaching/analyze',
           { user_idx: parseInt(userIdx) },
           { headers: { 'Authorization': token ? `Bearer ${token}` : '' } }
@@ -369,7 +369,7 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
           const { solutions, comparison_analysis } = response.data;
           setGptSolutions(solutions || []);
           setGptAnalysis(comparison_analysis || "");
-          localStorage.setItem('last_gpt_coaching', JSON.stringify({ id: analysisId, solutions, analysis: comparison_analysis }));
+          localStorage.setItem(`last_gpt_coaching_${userIdx}`, JSON.stringify({ id: analysisId, solutions, analysis: comparison_analysis }));
         }
       } catch (error) {
         console.error("GPT 코칭 로드 실패:", error);
@@ -415,11 +415,11 @@ function Coaching({ selectedPlan: initialPlan = 7, analysisResult }) {
       next[missionId - 1] = !next[missionId - 1];
       setHomeMissionChecks(next);
       const val = JSON.stringify(next);
-      localStorage.setItem(`mission_checks_${todayKey}`, val);
-      localStorage.removeItem(`mission_saved_${todayKey}`);
+      localStorage.setItem(`mission_checks_${userIdx}_${todayKey}`, val);
+      localStorage.removeItem(`mission_saved_${userIdx}_${todayKey}`);
       // 같은 탭 내 홈탭 동기화 (storage 이벤트는 타 탭에서만 발동하므로 수동 dispatch)
       window.dispatchEvent(new StorageEvent('storage', {
-        key: `mission_checks_${todayKey}`,
+        key: `mission_checks_${userIdx}_${todayKey}`,
         newValue: val,
       }));
     } else {
